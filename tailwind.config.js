@@ -8,38 +8,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(240 3.7% 15.9%)",
-        input: "hsl(240 3.7% 15.9%)",
-        ring: "hsl(240 4.9% 83.9%)",
-        background: "hsl(240 10% 3.9%)",
-        foreground: "hsl(0 0% 98%)",
+        border: "hsl(240, 5%, 84%)",
+        background: "#0a0a0a",
+        foreground: "#ffffff",
         primary: {
-          DEFAULT: "hsl(263.4 70% 50.4%)",
-          foreground: "hsl(0 0% 98%)"
-        },
-        secondary: {
-          DEFAULT: "hsl(240 3.7% 15.9%)",
-          foreground: "hsl(0 0% 98%)"
-        },
-        destructive: {
-          DEFAULT: "hsl(0 62.8% 30.6%)",
-          foreground: "hsl(0 0% 98%)"
-        },
-        muted: {
-          DEFAULT: "hsl(240 3.7% 15.9%)",
-          foreground: "hsl(240 5% 64.9%)"
+          DEFAULT: "#6366F1", // indigo-500
+          foreground: "#ffffff"
         },
         accent: {
-          DEFAULT: "hsl(240 3.7% 15.9%)",
-          foreground: "hsl(0 0% 98%)"
+          DEFAULT: "#ff6b35", // orange
+          foreground: "#ffffff"
         },
-        popover: {
-          DEFAULT: "hsl(240 10% 3.9%)",
-          foreground: "hsl(0 0% 98%)"
+        muted: {
+          DEFAULT: "#1a1a1a",
+          foreground: "#a3a3a3"
         },
         card: {
-          DEFAULT: "hsl(240 10% 3.9%)",
-          foreground: "hsl(0 0% 98%)"
+          DEFAULT: "#0f0f0f",
+          foreground: "#ffffff"
         }
       },
       borderRadius: {
