@@ -19,7 +19,7 @@ const BentoItem = ({ title, description, icon, className = "", delay = 0 }: Bent
       viewport={{ once: true }}
       transition={{ duration: 0.5, delay }}
       whileHover={{ scale: 1.02, transition: { duration: 0.2 } }}
-      className={`group relative overflow-hidden rounded-2xl bg-card border border-gray-800 p-8 hover:border-gray-700 transition-all duration-300 ${className}`}
+      className={`group relative overflow-hidden rounded-2xl bg-card border border-border p-8 hover:border-primary/50 transition-all duration-300 ${className}`}
     >
       <div className="relative z-10">
         <motion.div 
@@ -29,7 +29,7 @@ const BentoItem = ({ title, description, icon, className = "", delay = 0 }: Bent
         >
           {icon}
         </motion.div>
-        <h3 className="text-2xl font-bold mb-3 text-foreground">{title}</h3>
+        <h3 className="text-2xl font-bold mb-3 text-white">{title}</h3>
         <p className="text-muted-foreground leading-relaxed">{description}</p>
       </div>
       
@@ -49,18 +49,13 @@ interface BentoGridProps {
 
 export default function BentoGrid({ items }: BentoGridProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 auto-rows-fr">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {items.map((item, index) => (
         <BentoItem
           key={index}
           title={item.title}
           description={item.description}
           icon={item.icon}
-          className={
-            index === 0 ? "md:col-span-2 lg:col-span-2" : 
-            index === 1 ? "md:col-span-2 lg:col-span-2" :
-            ""
-          }
           delay={index * 0.1}
         />
       ))}

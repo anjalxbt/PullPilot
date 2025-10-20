@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useSession, signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import BentoGrid from "@/components/BentoGrid";
+import { Cable, ClipboardCheck, Search } from "lucide-react";
 
 export default function HomePage() {
   const { data: session } = useSession();
@@ -34,11 +35,11 @@ export default function HomePage() {
   ];
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background transition-colors duration-300">
       {/* Hero Section */}
       <section className="section relative overflow-hidden">
         {/* Animated background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/10 animate-gradient" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5 animate-gradient" />
         
         <div className="container-md relative z-10">
           <motion.div 
@@ -48,7 +49,7 @@ export default function HomePage() {
             transition={{ duration: 0.8 }}
           >
             <motion.h1 
-              className="h1 mb-6 bg-gradient-to-r from-white via-white to-gray-400 bg-clip-text text-transparent"
+              className="h1 mb-6 bg-gradient-to-r from-foreground via-foreground to-foreground/60 bg-clip-text text-transparent"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
@@ -91,13 +92,13 @@ export default function HomePage() {
                   Get Started →
                 </Button>
               )}
-              <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground underline transition-colors">
+              <Link href="#features" className="text-sm text-secondary hover:text-foreground underline transition-colors">
                 Want reviews in IDE? Learn More
               </Link>
             </motion.div>
 
             <motion.div 
-              className="mt-8 flex items-center justify-center gap-6 text-sm text-muted-foreground"
+              className="mt-8 flex items-center justify-center gap-6 text-sm text-secondary"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.8 }}
@@ -117,20 +118,20 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 1 }}
           >
-            <div className="relative rounded-2xl border border-gray-800 bg-card/50 backdrop-blur-sm p-6 shadow-2xl">
+            <div className="relative rounded-2xl border border-border bg-card/50 backdrop-blur-sm p-6 shadow-2xl transition-colors duration-300">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-full bg-gray-700" />
+                <div className="w-8 h-8 rounded-full bg-muted" />
                 <div className="flex-1">
-                  <div className="h-3 bg-gray-700 rounded w-32 mb-2" />
-                  <div className="h-2 bg-gray-800 rounded w-48" />
+                  <div className="h-3 bg-muted rounded w-32 mb-2" />
+                  <div className="h-2 bg-muted/60 rounded w-48" />
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="h-2 bg-gray-800 rounded w-full" />
-                <div className="h-2 bg-gray-800 rounded w-5/6" />
-                <div className="h-2 bg-gray-800 rounded w-4/6" />
+                <div className="h-2 bg-muted/60 rounded w-full" />
+                <div className="h-2 bg-muted/60 rounded w-5/6" />
+                <div className="h-2 bg-muted/60 rounded w-4/6" />
               </div>
-              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-accent/20 text-accent rounded-lg border border-accent/30">
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary/20 text-black rounded-lg border border-primary/30">
                 <span className="text-sm font-medium">📝 Create a PR</span>
               </div>
             </div>
@@ -139,7 +140,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Section - Bento Grid */}
-      <section id="features" className="section bg-background">
+      <section id="features" className="section bg-background transition-colors duration-300">
         <div className="container-md">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -159,7 +160,7 @@ export default function HomePage() {
       </section>
 
       {/* How It Works Section */}
-      <section id="how" className="section bg-muted/30">
+      <section id="how" className="section bg-muted/30 transition-colors duration-300">
         <div className="container-md">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -177,40 +178,42 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
-                icon: "🔗",
+                icon: <Cable className="w-12 h-12 text-primary" />,
                 step: "1. Connect GitHub",
                 description: "Authenticate with GitHub and select repositories to enable AI reviews."
               },
               {
-                icon: "🔍",
+                icon: <Search className="w-12 h-12 text-primary" />,
                 step: "2. Analyze Pull Request",
                 description: "AI automatically scans new PRs for issues, patterns, and improvements."
               },
               {
-                icon: "✅",
+                icon: <ClipboardCheck className="w-12 h-12 text-primary" />,
                 step: "3. Get AI Feedback",
                 description: "Receive actionable comments and suggestions to improve code quality."
               }
             ].map((item, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ y: -5 }}
-                className="text-center p-8 rounded-2xl bg-card border border-gray-800 hover:border-gray-700 transition-all duration-300"
-              >
-                <motion.div 
-                  className="text-6xl mb-6"
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  transition={{ type: "spring", stiffness: 300 }}
-                >
-                  {item.icon}
-                </motion.div>
-                <h3 className="text-xl font-semibold mb-3">{item.step}</h3>
-                <p className="text-muted-foreground">{item.description}</p>
-              </motion.div>
+               <motion.div
+          key={index}
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: index * 0.1 }}
+          whileHover={{ y: -5 }}
+          className="text-center p-8 rounded-2xl bg-card border border-border hover:border-primary/50 transition-all duration-300"
+        >
+          <motion.div
+            className="flex justify-center items-center mb-6"
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
+            {item.icon}
+          </motion.div>
+          <h3 className="text-xl font-semibold mb-3 text-card-foreground">
+            {item.step}
+          </h3>
+          <p className="text-muted-foreground">{item.description}</p>
+        </motion.div>
             ))}
           </div>
         </div>
@@ -218,7 +221,7 @@ export default function HomePage() {
 
       {/* CTA Section */}
       <section className="section relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-background to-primary/10" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
         
         <motion.div 
           className="container-md text-center relative z-10"

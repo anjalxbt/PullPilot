@@ -8,24 +8,28 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(240, 5%, 84%)",
-        background: "#0a0a0a",
-        foreground: "#ffffff",
+        border: "rgba(0, 0, 0, 0.1)",
+        background: "#FFE1AF",
+        foreground: "#111111",
         primary: {
-          DEFAULT: "#6366F1", // indigo-500
+          DEFAULT: "#3b82f6",
           foreground: "#ffffff"
         },
         accent: {
-          DEFAULT: "#ff6b35", // orange
+          DEFAULT: "#3b82f6",
           foreground: "#ffffff"
         },
         muted: {
-          DEFAULT: "#1a1a1a",
-          foreground: "#a3a3a3"
+          DEFAULT: "#f5f5f7",
+          foreground: "#555555"
         },
         card: {
-          DEFAULT: "#0f0f0f",
+          DEFAULT: "#1c1c1e",
           foreground: "#ffffff"
+        },
+        secondary: {
+          DEFAULT: "#555555",
+          foreground: "#111111"
         }
       },
       borderRadius: {

@@ -17,7 +17,7 @@ export function Tabs({ children, className, defaultValue, ...props }: TabsProps)
 
 export function TabsList({ children, className, value, setValue, ...props }: any) {
   return (
-    <div className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-gray-600", className)} {...props}>
+    <div className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground transition-colors duration-300", className)} {...props}>
       {React.Children.map(children, (child: any) => React.cloneElement(child, { value, setValue }))}
     </div>
   );
@@ -29,8 +29,8 @@ export function TabsTrigger({ children, className, value, setValue, tabValue, ..
     <button
       onClick={() => setValue(tabValue)}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition",
-        active ? "bg-white shadow-soft" : "text-gray-600 hover:text-gray-900",
+        "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all duration-200",
+        active ? "bg-background text-foreground shadow-soft" : "text-muted-foreground hover:text-foreground",
         className
       )}
       {...props}
