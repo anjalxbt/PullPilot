@@ -8,20 +8,38 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(240, 5%, 84%)",
-        background: "#ffffff",
-        foreground: "#0b1020",
+        border: "hsl(240 3.7% 15.9%)",
+        input: "hsl(240 3.7% 15.9%)",
+        ring: "hsl(240 4.9% 83.9%)",
+        background: "hsl(240 10% 3.9%)",
+        foreground: "hsl(0 0% 98%)",
         primary: {
-          DEFAULT: "#6366F1", // indigo-500
-          foreground: "#ffffff"
+          DEFAULT: "hsl(263.4 70% 50.4%)",
+          foreground: "hsl(0 0% 98%)"
+        },
+        secondary: {
+          DEFAULT: "hsl(240 3.7% 15.9%)",
+          foreground: "hsl(0 0% 98%)"
+        },
+        destructive: {
+          DEFAULT: "hsl(0 62.8% 30.6%)",
+          foreground: "hsl(0 0% 98%)"
         },
         muted: {
-          DEFAULT: "#f4f4f5",
-          foreground: "#6b7280"
+          DEFAULT: "hsl(240 3.7% 15.9%)",
+          foreground: "hsl(240 5% 64.9%)"
+        },
+        accent: {
+          DEFAULT: "hsl(240 3.7% 15.9%)",
+          foreground: "hsl(0 0% 98%)"
+        },
+        popover: {
+          DEFAULT: "hsl(240 10% 3.9%)",
+          foreground: "hsl(0 0% 98%)"
         },
         card: {
-          DEFAULT: "#ffffff",
-          foreground: "#0b1020"
+          DEFAULT: "hsl(240 10% 3.9%)",
+          foreground: "hsl(0 0% 98%)"
         }
       },
       borderRadius: {
@@ -31,7 +49,32 @@ module.exports = {
       },
       boxShadow: {
         soft: "0 2px 10px rgba(0,0,0,0.06)",
-      }
+        glow: "0 0 20px rgba(255, 107, 53, 0.3)",
+      },
+      animation: {
+        "fade-in": "fadeIn 0.6s ease-out",
+        "slide-up": "slideUp 0.6s ease-out",
+        "scale-in": "scaleIn 0.5s ease-out",
+        "float": "float 3s ease-in-out infinite",
+      },
+      keyframes: {
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        slideUp: {
+          "0%": { transform: "translateY(20px)", opacity: "0" },
+          "100%": { transform: "translateY(0)", opacity: "1" },
+        },
+        scaleIn: {
+          "0%": { transform: "scale(0.9)", opacity: "0" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+      },
     },
   },
   plugins: [],
