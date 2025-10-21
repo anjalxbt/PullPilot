@@ -19,28 +19,38 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === "github" && profile) {
         try {
           // Check if user already exists
-          const { data: existingUser } = await supabase
+          const { data: existingUser, error: fetchError } = await supabase
             .from("users")
             .select("*")
             .eq("github_id", profile.id?.toString())
-            .single();
+            .maybeSingle();
+
+          if (fetchError) {
+            console.error("Error fetching user from Supabase:", fetchError);
+            return false;
+          }
 
           if (!existingUser) {
             // Create new user in Supabase
-            const { error } = await supabase.from("users").insert({
+            const { error: insertError } = await supabase.from("users").insert({
               github_id: profile.id?.toString(),
               username: profile.login || profile.name || "unknown",
               email: user.email,
               avatar_url: user.image,
             });
 
-            if (error) {
-              console.error("Error creating user in Supabase:", error);
+            if (insertError) {
+              // If duplicate key error, user was created by another concurrent request - allow sign in
+              if (insertError.code === '23505') {
+                console.log("User already exists (concurrent creation), allowing sign in");
+                return true;
+              }
+              console.error("Error creating user in Supabase:", insertError);
               return false;
             }
           } else {
             // Update existing user data
-            const { error } = await supabase
+            const { error: updateError } = await supabase
               .from("users")
               .update({
                 username: profile.login || profile.name || existingUser.username,
@@ -49,8 +59,9 @@ export const authOptions: NextAuthOptions = {
               })
               .eq("github_id", profile.id?.toString());
 
-            if (error) {
-              console.error("Error updating user in Supabase:", error);
+            if (updateError) {
+              console.error("Error updating user in Supabase:", updateError);
+              // Don't block sign in on update errors
             }
           }
         } catch (error) {
