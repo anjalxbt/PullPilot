@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { githubFetch } from "@/lib/github-fetch";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -9,27 +10,18 @@ export async function GET() {
   }
 
   try {
-    const url = new URL("https://api.github.com/user/repos");
-    url.searchParams.set("per_page", "100");
-    url.searchParams.set("sort", "updated");
-    url.searchParams.set("visibility", "all");
-
-    const res = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${session.accessToken}`,
-        Accept: "application/vnd.github+json",
-      },
-      cache: "no-store",
+    const data = await githubFetch({
+      accessToken: session.accessToken,
+      endpoint: "/user/repos?per_page=100&sort=updated&visibility=all",
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json({ error: "GitHub repos fetch failed", detail: text }, { status: res.status });
-    }
-
-    const data = await res.json();
     return NextResponse.json(data);
   } catch (e: any) {
-    return NextResponse.json({ error: "Unexpected error", detail: e?.message || String(e) }, { status: 500 });
+    console.error("GitHub API Error:", e);
+    return NextResponse.json({ 
+      error: "Unexpected error", 
+      detail: e?.message || String(e),
+      cause: e?.cause?.message || e?.cause || "Unknown"
+    }, { status: 500 });
   }
 }
