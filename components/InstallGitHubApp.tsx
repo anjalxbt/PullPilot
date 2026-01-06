@@ -57,7 +57,7 @@ export default function InstallGitHubApp() {
         }
 
         // Redirect to GitHub App installation page
-        const installUrl = `https://github.com/apps/${githubAppClientId}/installations/new`;
+        const installUrl = `https://github.com/apps/pullpilot-repo/installations/new`;
         window.location.href = installUrl;
     };
 
