@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabaseAdmin } from './supabase';
 
 export interface GitHubInstallation {
     id: string;
@@ -51,7 +51,7 @@ export async function storeInstallation(data: {
     target_type: string;
     user_id: string;
 }) {
-    const { data: installation, error } = await supabase
+    const { data: installation, error } = await supabaseAdmin
         .from('github_installations')
         .upsert({
             installation_id: data.installation_id,
@@ -78,7 +78,7 @@ export async function storeInstallation(data: {
  * Get installation by installation_id
  */
 export async function getInstallationById(installation_id: number) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('github_installations')
         .select('*')
         .eq('installation_id', installation_id)
@@ -96,7 +96,7 @@ export async function getInstallationById(installation_id: number) {
  * Get all installations for a user
  */
 export async function getUserInstallations(user_id: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('github_installations')
         .select('*')
         .eq('user_id', user_id)
@@ -122,7 +122,7 @@ export async function storeRepository(data: {
     is_private: boolean;
     default_branch: string;
 }) {
-    const { data: repository, error } = await supabase
+    const { data: repository, error } = await supabaseAdmin
         .from('repositories')
         .upsert({
             installation_id: data.installation_id,
@@ -150,7 +150,7 @@ export async function storeRepository(data: {
  * Get repositories for an installation
  */
 export async function getInstallationRepositories(installation_id: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('repositories')
         .select('*')
         .eq('installation_id', installation_id)
@@ -168,7 +168,7 @@ export async function getInstallationRepositories(installation_id: string) {
  * Get repository by repo_id
  */
 export async function getRepositoryByRepoId(repo_id: number) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('repositories')
         .select('*')
         .eq('repo_id', repo_id)
@@ -196,7 +196,7 @@ export async function storePRReview(data: {
     deletions: number;
     ai_model: string;
 }) {
-    const { data: review, error } = await supabase
+    const { data: review, error } = await supabaseAdmin
         .from('pull_request_reviews')
         .insert({
             repository_id: data.repository_id,
@@ -224,7 +224,7 @@ export async function storePRReview(data: {
  * Get PR reviews for a repository
  */
 export async function getRepositoryReviews(repository_id: string, limit = 50) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
         .from('pull_request_reviews')
         .select('*')
         .eq('repository_id', repository_id)
@@ -243,7 +243,7 @@ export async function getRepositoryReviews(repository_id: string, limit = 50) {
  * Delete installation and cascade delete repositories and reviews
  */
 export async function deleteInstallation(installation_id: number) {
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
         .from('github_installations')
         .delete()
         .eq('installation_id', installation_id);
