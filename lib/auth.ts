@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
-import { supabase } from "./supabase";
+import { supabase, supabaseAdmin } from "./supabase";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -80,17 +80,25 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session.user && token.githubId) {
-        // Fetch user data from Supabase
-        const { data: userData } = await supabase
+        // Fetch user data from Supabase using admin client
+        const { data: userData, error } = await supabaseAdmin
           .from("users")
           .select("*")
           .eq("github_id", token.githubId as string)
-          .single();
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching user in session:", error);
+        }
 
         if (userData) {
           session.user.id = userData.id;
           session.user.githubId = userData.github_id;
           session.user.username = userData.username;
+        } else {
+          console.warn("User not found in database for github_id:", token.githubId);
+          // Set a temporary ID to prevent undefined errors
+          session.user.id = "";
         }
         session.accessToken = token.accessToken as string;
       }
