@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import AnalyticsChart from "@/components/AnalyticsChart";
+import InstallGitHubApp from "@/components/InstallGitHubApp";
 import { Star, Lock, Globe, Search, Github } from "lucide-react";
 
 type GitHubUser = {
@@ -122,6 +123,7 @@ export default function DashboardPage() {
           <TabsList>
             <TabsTrigger tabValue="prs">Pull Requests</TabsTrigger>
             <TabsTrigger tabValue="repos">Repositories</TabsTrigger>
+            <TabsTrigger tabValue="installations">Installations</TabsTrigger>
             <TabsTrigger tabValue="analytics">Analytics</TabsTrigger>
             <TabsTrigger tabValue="settings">Settings</TabsTrigger>
           </TabsList>
@@ -211,11 +213,10 @@ export default function DashboardPage() {
                           {/* Visibility Badge */}
                           <div className="mb-4">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors duration-300 ${
-                                repo.private
-                                  ? "bg-muted text-muted-foreground border border-border"
-                                  : "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50"
-                              }`}
+                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors duration-300 ${repo.private
+                                ? "bg-muted text-muted-foreground border border-border"
+                                : "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50"
+                                }`}
                             >
                               {repo.visibility ?? (repo.private ? "private" : "public")}
                             </span>
@@ -249,6 +250,11 @@ export default function DashboardPage() {
                   </Card>
                 )}
             </div>
+          </TabsContent>
+
+          {/* Installations Tab */}
+          <TabsContent tabValue="installations">
+            <InstallGitHubApp />
           </TabsContent>
 
           {/* Analytics Tab */}
