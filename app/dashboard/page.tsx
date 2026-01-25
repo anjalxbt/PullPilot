@@ -1,18 +1,17 @@
 "use client";
-import { useSession, signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import AnalyticsChart from "@/components/AnalyticsChart";
 import InstallGitHubApp from "@/components/InstallGitHubApp";
-import { Star, Lock, Globe, Search, Github } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar, ExternalLink, FileText, Github, GitPullRequest, Globe, Lock, Search, Star } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 type GitHubUser = {
   login: string;
@@ -31,12 +30,26 @@ type GitHubRepo = {
   updated_at: string;
 };
 
+type Review = {
+  id: string;
+  pr_number: number;
+  pr_title: string;
+  review_summary: string;
+  review_posted_at: string;
+  repositories: {
+    repo_full_name: string;
+    repo_name: string;
+  };
+};
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [ghUser, setGhUser] = useState<GitHubUser | null>(null);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingRepos, setLoadingRepos] = useState(false);
+  const [loadingReviews, setLoadingReviews] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -52,11 +65,15 @@ export default function DashboardPage() {
       if (!session) return;
       setError(null);
       try {
-        const [uRes, rRes] = await Promise.all([
+        const [uRes, rRes, revRes] = await Promise.all([
           fetch("/api/github/user", { cache: "no-store" }),
           (async () => {
             setLoadingRepos(true);
             return fetch("/api/github/repos", { cache: "no-store" });
+          })(),
+          (async () => {
+            setLoadingReviews(true);
+            return fetch("/api/github/reviews", { cache: "no-store" });
           })(),
         ]);
 
@@ -76,11 +93,23 @@ export default function DashboardPage() {
             const t = await rRes.text();
             setError((prev) => prev ?? `Failed to load repositories: ${t}`);
           }
+
+          if (revRes.ok) {
+            const rev = (await revRes.json()) as Review[];
+            setReviews(rev);
+          } else {
+            const t = await revRes.text();
+            // Don't fail everything if reviews fail
+            console.error("Failed to load reviews:", t);
+          }
         }
       } catch (e: any) {
         if (!canceled) setError(e?.message || "Unexpected error");
       } finally {
-        if (!canceled) setLoadingRepos(false);
+        if (!canceled) {
+          setLoadingRepos(false);
+          setLoadingReviews(false);
+        }
       }
     }
     load();
@@ -129,15 +158,66 @@ export default function DashboardPage() {
           </TabsList>
 
           <TabsContent tabValue="prs">
-            <Card className="bg-card border-border transition-colors duration-300">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Recent Pull Requests</CardTitle>
-                <CardDescription className="text-muted-foreground">AI-reviewed pull requests from your repositories</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">No recent PRs yet.</div>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <Card className="bg-card border-border transition-colors duration-300">
+                <CardHeader>
+                  <CardTitle className="text-card-foreground">Recent Pull Requests</CardTitle>
+                  <CardDescription className="text-muted-foreground">AI-reviewed pull requests from your repositories</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loadingReviews ? (
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-24 bg-muted/50 rounded-lg animate-pulse" />
+                      ))}
+                    </div>
+                  ) : reviews.length === 0 ? (
+                    <div className="text-center py-8">
+                      <GitPullRequest className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No reviewed pull requests found.</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Install the GitHub App on your repositories to start getting reviews.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {reviews.map((review, index) => (
+                        <div
+                          key={review.id}
+                          className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-all duration-200"
+                          style={{
+                            animation: `fadeIn 0.5s ease-out ${index * 0.05}s both`,
+                          }}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                                  {review.repositories.repo_full_name}
+                                </span>
+                                <span className="text-muted-foreground text-sm flex items-center gap-1">
+                                  <span className="font-mono">#{review.pr_number}</span>
+                                </span>
+                              </div>
+                              <h4 className="font-medium text-card-foreground truncate">{review.pr_title || `Pull Request #${review.pr_number}`}</h4>
+                            </div>
+                            <div className="ml-4 text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatRelativeTime(review.review_posted_at)}
+                            </div>
+                          </div>
+
+                          <div className="mt-2 text-sm text-secondary line-clamp-2">
+                            <FileText className="inline-block h-3 w-3 mr-1 text-muted-foreground" />
+                            {review.review_summary}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent tabValue="repos">
@@ -183,57 +263,69 @@ export default function DashboardPage() {
                       repo.full_name.toLowerCase().includes(searchQuery.toLowerCase())
                     )
                     .map((repo, index) => (
-                      <a
+                      <div
                         key={repo.id}
-                        href={repo.html_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group block"
+                        className="group relative"
                         style={{
                           animation: `fadeIn 0.5s ease-out ${index * 0.05}s both`,
                         }}
                       >
-                        <div className="h-full p-5 bg-card border border-border rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 hover:border-primary/50">
-                          {/* Header */}
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-base font-semibold text-card-foreground truncate group-hover:text-primary transition-colors">
-                                {repo.full_name}
-                              </h3>
+                        <a
+                          href={`/dashboard/repository/${repo.id}`}
+                          className="block h-full"
+                        >
+                          <div className="h-full p-5 bg-card border border-border rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/10 hover:border-primary/50">
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-base font-semibold text-card-foreground truncate group-hover:text-primary transition-colors pr-6">
+                                  {repo.full_name}
+                                </h3>
+                              </div>
+                              <div className="ml-2 flex-shrink-0 flex items-center gap-2">
+                                <a
+                                  href={repo.html_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-muted-foreground hover:text-primary transition-colors p-1"
+                                  title="View on GitHub"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                                {repo.private ? (
+                                  <Lock className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <Globe className="h-4 w-4 text-muted-foreground" />
+                                )}
+                              </div>
                             </div>
-                            <div className="ml-2 flex-shrink-0">
-                              {repo.private ? (
-                                <Lock className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <Globe className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </div>
-                          </div>
 
-                          {/* Visibility Badge */}
-                          <div className="mb-4">
-                            <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors duration-300 ${repo.private
-                                ? "bg-muted text-muted-foreground border border-border"
-                                : "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50"
-                                }`}
-                            >
-                              {repo.visibility ?? (repo.private ? "private" : "public")}
-                            </span>
-                          </div>
+                            {/* Visibility Badge */}
+                            <div className="mb-4">
+                              <span
+                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors duration-300 ${repo.private
+                                  ? "bg-muted text-muted-foreground border border-border"
+                                  : "bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-900/50"
+                                  }`}
+                              >
+                                {repo.visibility ?? (repo.private ? "private" : "public")}
+                              </span>
+                            </div>
 
-                          {/* Footer */}
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Star className="h-4 w-4" />
-                              <span>{repo.stargazers_count}</span>
-                            </div>
-                            <div className="text-xs">
-                              {formatRelativeTime(repo.updated_at)}
+                            {/* Footer */}
+                            <div className="flex items-center justify-between text-sm text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4" />
+                                <span>{repo.stargazers_count}</span>
+                              </div>
+                              <div className="text-xs">
+                                {formatRelativeTime(repo.updated_at)}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </a>
+                        </a>
+                      </div>
                     ))}
                 </div>
               )}

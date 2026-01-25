@@ -2,7 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   experimental: {
-    serverActions: true,
   },
   // Ensure proper DNS resolution for GitHub API
   webpack: (config, { isServer }) => {
