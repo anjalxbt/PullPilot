@@ -156,7 +156,7 @@ export default function RepositoryPage({ params }: { params: { repoId: string } 
                                     <GitPullRequest className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                                     <p className="text-muted-foreground">No reviewed pull requests found for this repository.</p>
                                     <p className="text-sm text-muted-foreground mt-2">
-                                        Make sure the PullPilot app is installed and you've opened a PR.
+                                        Make sure the PullPilot app is installed and you&apos;ve opened a PR.
                                     </p>
                                 </div>
                             ) : (
