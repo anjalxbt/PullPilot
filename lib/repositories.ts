@@ -255,3 +255,189 @@ export async function deleteInstallation(installation_id: number) {
 
     return true;
 }
+
+// ========== SECURITY FINDINGS ==========
+
+export interface SecurityFindingRecord {
+    id: string;
+    review_id: string;
+    rule_id: string;
+    rule_name: string;
+    severity: 'critical' | 'high' | 'medium' | 'low';
+    category: string;
+    message: string;
+    file_path: string | null;
+    line_number: number | null;
+    code_snippet: string | null;
+    created_at: string;
+}
+
+export interface SecuritySummary {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    total: number;
+}
+
+/**
+ * Store security findings for a PR review
+ */
+export async function storeSecurityFindings(
+    review_id: string,
+    findings: Array<{
+        ruleId: string;
+        ruleName: string;
+        severity: 'critical' | 'high' | 'medium' | 'low';
+        category: string;
+        message: string;
+        file: string;
+        line?: number;
+        snippet?: string;
+    }>
+): Promise<SecurityFindingRecord[]> {
+    if (findings.length === 0) {
+        return [];
+    }
+
+    const records = findings.map(f => ({
+        review_id,
+        rule_id: f.ruleId,
+        rule_name: f.ruleName,
+        severity: f.severity,
+        category: f.category,
+        message: f.message,
+        file_path: f.file,
+        line_number: f.line ?? null,
+        code_snippet: f.snippet ?? null,
+    }));
+
+    const { data, error } = await supabaseAdmin
+        .from('security_findings')
+        .insert(records)
+        .select();
+
+    if (error) {
+        console.error('Error storing security findings:', error);
+        throw error;
+    }
+
+    return data as SecurityFindingRecord[];
+}
+
+/**
+ * Update PR review with security summary counts
+ */
+export async function updateReviewSecuritySummary(
+    review_id: string,
+    summary: SecuritySummary
+): Promise<void> {
+    const { error } = await supabaseAdmin
+        .from('pull_request_reviews')
+        .update({
+            security_critical: summary.critical,
+            security_high: summary.high,
+            security_medium: summary.medium,
+            security_low: summary.low,
+            security_total: summary.total,
+        })
+        .eq('id', review_id);
+
+    if (error) {
+        console.error('Error updating review security summary:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get security findings for a PR review
+ */
+export async function getReviewSecurityFindings(review_id: string): Promise<SecurityFindingRecord[]> {
+    const { data, error } = await supabaseAdmin
+        .from('security_findings')
+        .select('*')
+        .eq('review_id', review_id)
+        .order('severity', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching security findings:', error);
+        throw error;
+    }
+
+    return data as SecurityFindingRecord[];
+}
+
+/**
+ * Get security findings summary for a repository
+ */
+export async function getRepositorySecuritySummary(repository_id: string): Promise<{
+    totalFindings: number;
+    bySeverity: SecuritySummary;
+    byCategory: Record<string, number>;
+    recentFindings: SecurityFindingRecord[];
+}> {
+    // Get all reviews for the repository
+    const { data: reviews, error: reviewsError } = await supabaseAdmin
+        .from('pull_request_reviews')
+        .select('id, security_critical, security_high, security_medium, security_low, security_total')
+        .eq('repository_id', repository_id);
+
+    if (reviewsError) {
+        console.error('Error fetching reviews:', reviewsError);
+        throw reviewsError;
+    }
+
+    // Aggregate security summary
+    const bySeverity: SecuritySummary = {
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        total: 0,
+    };
+
+    for (const review of reviews || []) {
+        bySeverity.critical += review.security_critical || 0;
+        bySeverity.high += review.security_high || 0;
+        bySeverity.medium += review.security_medium || 0;
+        bySeverity.low += review.security_low || 0;
+        bySeverity.total += review.security_total || 0;
+    }
+
+    // Get recent findings with category breakdown
+    const reviewIds = (reviews || []).map(r => r.id);
+
+    if (reviewIds.length === 0) {
+        return {
+            totalFindings: 0,
+            bySeverity,
+            byCategory: {},
+            recentFindings: [],
+        };
+    }
+
+    const { data: findings, error: findingsError } = await supabaseAdmin
+        .from('security_findings')
+        .select('*')
+        .in('review_id', reviewIds)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+    if (findingsError) {
+        console.error('Error fetching findings:', findingsError);
+        throw findingsError;
+    }
+
+    // Count by category
+    const byCategory: Record<string, number> = {};
+    for (const finding of findings || []) {
+        byCategory[finding.category] = (byCategory[finding.category] || 0) + 1;
+    }
+
+    return {
+        totalFindings: bySeverity.total,
+        bySeverity,
+        byCategory,
+        recentFindings: findings as SecurityFindingRecord[],
+    };
+}

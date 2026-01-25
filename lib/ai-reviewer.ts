@@ -5,6 +5,13 @@
  * You can integrate with OpenAI, Anthropic, or other AI providers.
  */
 
+import {
+    scanForSecurityIssues,
+    formatSecurityComment,
+    SecurityScanResult,
+    SecurityFinding
+} from './security-scanner';
+
 interface PRFile {
     filename: string;
     status: string;
@@ -14,12 +21,13 @@ interface PRFile {
     patch?: string;
 }
 
-interface ReviewResult {
+export interface ReviewResult {
     summary: string;
     highlights: string[];
     concerns: string[];
     suggestions: string[];
     aiModel: string;
+    securityScan: SecurityScanResult;
 }
 
 /**
@@ -31,18 +39,28 @@ export async function analyzePullRequest(
     files: PRFile[],
     diff: string
 ): Promise<ReviewResult> {
+    // Run security scan first
+    const securityScan = scanForSecurityIssues(diff, files);
+
     // Check if AI provider is configured
     const openaiKey = process.env.OPENAI_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
+    let baseReview: Omit<ReviewResult, 'securityScan'>;
+
     if (openaiKey) {
-        return await analyzeWithOpenAI(prTitle, prDescription, files, diff);
+        baseReview = await analyzeWithOpenAI(prTitle, prDescription, files, diff);
     } else if (anthropicKey) {
-        return await analyzeWithAnthropic(prTitle, prDescription, files, diff);
+        baseReview = await analyzeWithAnthropic(prTitle, prDescription, files, diff);
     } else {
         // Fallback to basic analysis without AI
-        return generateBasicReview(prTitle, prDescription, files);
+        baseReview = generateBasicReview(prTitle, prDescription, files);
     }
+
+    return {
+        ...baseReview,
+        securityScan,
+    };
 }
 
 /**
@@ -53,7 +71,7 @@ async function analyzeWithOpenAI(
     prDescription: string,
     files: PRFile[],
     diff: string
-): Promise<ReviewResult> {
+): Promise<Omit<ReviewResult, 'securityScan'>> {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -110,7 +128,7 @@ async function analyzeWithAnthropic(
     prDescription: string,
     files: PRFile[],
     diff: string
-): Promise<ReviewResult> {
+): Promise<Omit<ReviewResult, 'securityScan'>> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
@@ -210,7 +228,7 @@ Keep your review constructive, specific, and helpful.`;
 /**
  * Parse AI response into structured format
  */
-function parseAIResponse(response: string, model: string): ReviewResult {
+function parseAIResponse(response: string, model: string): Omit<ReviewResult, 'securityScan'> {
     const sections = {
         summary: '',
         highlights: [] as string[],
@@ -276,7 +294,7 @@ function generateBasicReview(
     prTitle: string,
     prDescription: string,
     files: PRFile[]
-): ReviewResult {
+): Omit<ReviewResult, 'securityScan'> {
     const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
     const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
     const filesChanged = files.length;
@@ -302,6 +320,14 @@ function generateBasicReview(
  */
 export function formatReviewComment(review: ReviewResult): string {
     let comment = `## 🤖 AI Code Review\n\n`;
+
+    // Add security scan results first if there are findings
+    if (review.securityScan && review.securityScan.findings.length > 0) {
+        comment += formatSecurityComment(review.securityScan);
+        comment += `\n\n`;
+    } else if (review.securityScan) {
+        comment += `## 🔒 Security Scan\n\n✅ No security issues detected!\n\n`;
+    }
 
     comment += `### Summary\n${review.summary}\n\n`;
 

@@ -5,6 +5,8 @@ import {
     getRepositoryByRepoId,
     storeRepository,
     storePRReview,
+    storeSecurityFindings,
+    updateReviewSecuritySummary,
 } from '@/lib/repositories';
 import {
     getPullRequest,
@@ -150,7 +152,7 @@ async function handlePullRequestEvent(payload: any) {
         );
 
         // Store review in database
-        await storePRReview({
+        const prReview = await storePRReview({
             repository_id: repoRecord.id,
             pr_number: pullRequest.number,
             pr_title: pullRequest.title,
@@ -162,9 +164,16 @@ async function handlePullRequestEvent(payload: any) {
             ai_model: review.aiModel,
         });
 
+        // Store security findings if any
+        if (review.securityScan && review.securityScan.findings.length > 0) {
+            await storeSecurityFindings(prReview.id, review.securityScan.findings);
+            await updateReviewSecuritySummary(prReview.id, review.securityScan.summary);
+        }
+
         return NextResponse.json({
             message: 'PR reviewed successfully',
             pr_number: pullRequest.number,
+            security_findings: review.securityScan?.summary.total || 0,
         });
     } catch (error) {
         console.error('Error processing pull request:', error);
