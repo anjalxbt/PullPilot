@@ -1,0 +1,57 @@
+# Sample PullPilot Configuration
+# Place this file in the root of your repository as .pullpilot.yml
+
+version: 1
+
+rules:
+  # Flag large PRs
+  - id: pr-size-check
+    name: "Large PR Warning"
+    type: pr-size
+    condition:
+      max_lines: 500
+    severity: warning
+    message: "⚠️ This PR has more than 500 lines. Consider breaking it into smaller PRs."
+
+  # Require tests for API changes
+  - id: api-test-required
+    name: "API Test Requirement"
+    type: file-pattern
+    condition:
+      changed_files: "src/api/**"
+      require_files: "**/*.test.*"
+    severity: error
+    message: "❌ Changes to API require corresponding test updates."
+
+  # Block .env file changes
+  - id: block-env-changes
+    name: "Environment File Protection"
+    type: file-pattern
+    condition:
+      block_files: ".env*"
+    severity: error
+    message: "🚫 Direct changes to environment files are not allowed."
+
+  # Detect console.log statements
+  - id: no-console-logs
+    name: "No Console Logs"
+    type: content-pattern
+    condition:
+      pattern: "console\\.log\\("
+      file_extensions: [".ts", ".js", ".tsx", ".jsx"]
+      exclude_paths: ["**/test/**", "**/*.test.*"]
+    severity: warning
+    message: "🔍 Found console.log statements. Please remove before merging."
+
+  # Require minimum reviewers
+  - id: require-reviewers
+    name: "Reviewer Required"
+    type: reviewers
+    condition:
+      min_reviewers: 2
+    severity: info
+    message: "👥 Consider adding at least 2 reviewers for this PR."
+
+settings:
+  auto_comment: true
+  ignore_draft_prs: true

@@ -16,6 +16,8 @@ import {
     addLabelsToIssue,
 } from '@/lib/github-app';
 import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
+import { fetchPullPilotConfig } from '@/lib/rules-fetcher';
+import { evaluateRules, formatRulesComment, PRContext } from '@/lib/rules-engine';
 
 export async function POST(request: NextRequest) {
     try {
@@ -142,8 +144,45 @@ async function handlePullRequestEvent(payload: any) {
             prDiff
         );
 
-        // Format and post comment
-        const comment = formatReviewComment(review);
+        // Fetch and evaluate custom rules from .pullpilot.yml
+        let rulesViolations: any = null;
+        try {
+            const rulesConfig = await fetchPullPilotConfig(
+                installation.id,
+                repository.owner.login,
+                repository.name,
+                pullRequest.head.ref
+            );
+
+            if (rulesConfig) {
+                // Skip if draft PR and config says to ignore drafts
+                if (!(rulesConfig.settings?.ignore_draft_prs && pullRequest.draft)) {
+                    const prContext: PRContext = {
+                        additions: prDetails.additions,
+                        deletions: prDetails.deletions,
+                        changedFiles: prFiles.map((f: any) => f.filename),
+                        diff: prDiff,
+                        reviewerCount: pullRequest.requested_reviewers?.length || 0,
+                        hasCodeownersApproval: false, // Would need additional API call
+                        isDraft: pullRequest.draft || false,
+                    };
+
+                    rulesViolations = evaluateRules(rulesConfig, prContext);
+                    console.log(`Custom rules check: ${rulesViolations.summary.total} violation(s)`);
+                }
+            }
+        } catch (error) {
+            console.error('Error evaluating custom rules:', error);
+            // Don't fail the review if rules evaluation fails
+        }
+
+        // Format and post comment (combine AI review + rules violations)
+        let comment = formatReviewComment(review);
+        if (rulesViolations && rulesViolations.violations.length > 0) {
+            const rulesComment = formatRulesComment(rulesViolations);
+            comment = comment + '\n\n' + rulesComment;
+        }
+
         await postPRComment(
             installation.id,
             repository.owner.login,
@@ -191,6 +230,7 @@ async function handlePullRequestEvent(payload: any) {
             pr_number: pullRequest.number,
             security_findings: review.securityScan?.summary.total || 0,
             labels_applied: labelsToApply,
+            custom_rules_violations: rulesViolations?.summary.total || 0,
         });
     } catch (error) {
         console.error('Error processing pull request:', error);
