@@ -1,7 +1,9 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Calendar, ExternalLink, FileText, Github, GitPullRequest, Star } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import SecurityFindings, { SecurityFinding, SecuritySummary } from "@/components/SecurityFindings";
+import { ArrowLeft, Calendar, ExternalLink, FileText, Github, GitPullRequest, Shield, Star } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -23,10 +25,16 @@ type Review = {
     pr_title: string;
     review_summary: string;
     review_posted_at: string;
+    security_total?: number;
     repositories: {
         repo_full_name: string;
         repo_name: string;
     };
+};
+
+type SecurityData = {
+    findings: SecurityFinding[];
+    summary: SecuritySummary;
 };
 
 export default function RepositoryPage({ params }: { params: { repoId: string } }) {
@@ -36,7 +44,12 @@ export default function RepositoryPage({ params }: { params: { repoId: string } 
 
     const [repo, setRepo] = useState<GitHubRepo | null>(null);
     const [reviews, setReviews] = useState<Review[]>([]);
+    const [securityData, setSecurityData] = useState<SecurityData>({
+        findings: [],
+        summary: { critical: 0, high: 0, medium: 0, low: 0, total: 0 }
+    });
     const [loading, setLoading] = useState(true);
+    const [securityLoading, setSecurityLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -78,7 +91,26 @@ export default function RepositoryPage({ params }: { params: { repoId: string } 
             }
         }
 
+        async function loadSecurity() {
+            setSecurityLoading(true);
+            try {
+                const securityRes = await fetch(`/api/github/security?repoId=${repoId}`);
+                if (securityRes.ok) {
+                    const data = await securityRes.json();
+                    setSecurityData({
+                        findings: data.findings || [],
+                        summary: data.summary || { critical: 0, high: 0, medium: 0, low: 0, total: 0 }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to load security data:", e);
+            } finally {
+                setSecurityLoading(false);
+            }
+        }
+
         load();
+        loadSecurity();
     }, [session, repoId]);
 
     if (status === "loading" || (loading && !repo)) {
@@ -101,6 +133,9 @@ export default function RepositoryPage({ params }: { params: { repoId: string } 
             </main>
         );
     }
+
+    // Calculate total security issues across reviews
+    const totalSecurityIssues = securityData.summary.total;
 
     return (
         <main className="min-h-screen bg-background transition-colors duration-300">
@@ -143,59 +178,117 @@ export default function RepositoryPage({ params }: { params: { repoId: string } 
                     )}
                 </div>
 
-                {/* Content */}
-                <div className="space-y-6">
-                    <Card className="bg-card border-border transition-colors duration-300">
-                        <CardHeader>
-                            <CardTitle className="text-card-foreground">Pull Requests & Reviews</CardTitle>
-                            <CardDescription className="text-muted-foreground">AI-reviewed pull requests for {repo?.name}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {reviews.length === 0 ? (
-                                <div className="text-center py-12">
-                                    <GitPullRequest className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                    <p className="text-muted-foreground">No reviewed pull requests found for this repository.</p>
-                                    <p className="text-sm text-muted-foreground mt-2">
-                                        Make sure the PullPilot app is installed and you&apos;ve opened a PR.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {reviews.map((review, index) => (
-                                        <div
-                                            key={review.id}
-                                            className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-all duration-200"
-                                            style={{
-                                                animation: `fadeIn 0.5s ease-out ${index * 0.05}s both`,
-                                            }}
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <span className="text-muted-foreground text-sm flex items-center gap-1">
-                                                            <span className="font-mono">#{review.pr_number}</span>
-                                                        </span>
-                                                    </div>
-                                                    <h4 className="font-medium text-card-foreground truncate">{review.pr_title || `Pull Request #${review.pr_number}`}</h4>
-                                                </div>
-                                                <div className="ml-4 text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                                                    <Calendar className="h-3 w-3" />
-                                                    {new Date(review.review_posted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: '2-digit', minute: '2-digit' })}
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-2 text-sm text-secondary">
-                                                <FileText className="inline-block h-3 w-3 mr-1 text-muted-foreground" />
-                                                {review.review_summary}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                {/* Tabs Content */}
+                <Tabs defaultValue="reviews" className="space-y-6">
+                    <TabsList className="grid w-full grid-cols-2 max-w-md">
+                        <TabsTrigger tabValue="reviews" className="flex items-center gap-2">
+                            <GitPullRequest className="h-4 w-4" />
+                            Pull Requests
+                            {reviews.length > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary/10 text-primary rounded-full">
+                                    {reviews.length}
+                                </span>
                             )}
-                        </CardContent>
-                    </Card>
-                </div>
+                        </TabsTrigger>
+                        <TabsTrigger tabValue="security" className="flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Security
+                            {totalSecurityIssues > 0 && (
+                                <span className={`ml-1 px-1.5 py-0.5 text-xs rounded-full ${securityData.summary.critical > 0
+                                        ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
+                                        : securityData.summary.high > 0
+                                            ? 'bg-orange-100 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400'
+                                            : 'bg-yellow-100 dark:bg-yellow-950/50 text-yellow-600 dark:text-yellow-400'
+                                    }`}>
+                                    {totalSecurityIssues}
+                                </span>
+                            )}
+                        </TabsTrigger>
+                    </TabsList>
+
+                    {/* Pull Requests Tab */}
+                    <TabsContent tabValue="reviews">
+                        <Card className="bg-card border-border transition-colors duration-300">
+                            <CardHeader>
+                                <CardTitle className="text-card-foreground">Pull Requests & Reviews</CardTitle>
+                                <CardDescription className="text-muted-foreground">AI-reviewed pull requests for {repo?.name}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {reviews.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <GitPullRequest className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                        <p className="text-muted-foreground">No reviewed pull requests found for this repository.</p>
+                                        <p className="text-sm text-muted-foreground mt-2">
+                                            Make sure the PullPilot app is installed and you&apos;ve opened a PR.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {reviews.map((review, index) => (
+                                            <div
+                                                key={review.id}
+                                                className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-all duration-200"
+                                                style={{
+                                                    animation: `fadeIn 0.5s ease-out ${index * 0.05}s both`,
+                                                }}
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-muted-foreground text-sm flex items-center gap-1">
+                                                                <span className="font-mono">#{review.pr_number}</span>
+                                                            </span>
+                                                            {review.security_total && review.security_total > 0 && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-full bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400">
+                                                                    <Shield className="h-3 w-3" />
+                                                                    {review.security_total}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="font-medium text-card-foreground truncate">{review.pr_title || `Pull Request #${review.pr_number}`}</h4>
+                                                    </div>
+                                                    <div className="ml-4 text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {new Date(review.review_posted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-2 text-sm text-secondary">
+                                                    <FileText className="inline-block h-3 w-3 mr-1 text-muted-foreground" />
+                                                    {review.review_summary}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Security Tab */}
+                    <TabsContent tabValue="security">
+                        <Card className="bg-card border-border transition-colors duration-300">
+                            <CardHeader>
+                                <CardTitle className="text-card-foreground flex items-center gap-2">
+                                    <Shield className="h-5 w-5" />
+                                    Security Findings
+                                </CardTitle>
+                                <CardDescription className="text-muted-foreground">
+                                    Security vulnerabilities detected in pull request reviews
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <SecurityFindings
+                                    findings={securityData.findings}
+                                    summary={securityData.summary}
+                                    loading={securityLoading}
+                                />
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </main>
     );
 }
+
