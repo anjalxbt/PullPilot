@@ -182,3 +182,64 @@ export async function getFileContent(
         endpoint,
     });
 }
+
+/**
+ * Add labels to an issue/PR
+ */
+export async function addLabelsToIssue(
+    installationId: number,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    labels: string[]
+): Promise<void> {
+    if (labels.length === 0) return;
+
+    const token = await getInstallationAccessToken(installationId);
+
+    try {
+        await githubFetch({
+            accessToken: token,
+            endpoint: `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
+            method: 'POST',
+            body: { labels },
+        });
+        console.log(`Applied labels to #${issueNumber}:`, labels);
+    } catch (error) {
+        console.error('Error adding labels:', error);
+        // Don't throw - labels are not critical
+    }
+}
+
+/**
+ * Create a label in a repository if it doesn't exist
+ */
+export async function createLabel(
+    installationId: number,
+    owner: string,
+    repo: string,
+    name: string,
+    color: string,
+    description?: string
+): Promise<boolean> {
+    const token = await getInstallationAccessToken(installationId);
+
+    try {
+        await githubFetch({
+            accessToken: token,
+            endpoint: `/repos/${owner}/${repo}/labels`,
+            method: 'POST',
+            body: { name, color, description },
+        });
+        console.log(`Created label "${name}" in ${owner}/${repo}`);
+        return true;
+    } catch (error: any) {
+        // Label might already exist (422 error)
+        if (error.message?.includes('422') || error.message?.includes('already_exists')) {
+            return true;
+        }
+        console.error('Error creating label:', error);
+        return false;
+    }
+}
+

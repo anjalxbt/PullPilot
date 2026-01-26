@@ -13,6 +13,7 @@ import {
     getPullRequestFiles,
     getPullRequestDiff,
     postPRComment,
+    addLabelsToIssue,
 } from '@/lib/github-app';
 import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
 
@@ -170,10 +171,26 @@ async function handlePullRequestEvent(payload: any) {
             await updateReviewSecuritySummary(prReview.id, review.securityScan.summary);
         }
 
+        // Apply auto-labels (only high confidence)
+        const labelsToApply = review.suggestedLabels
+            .filter(l => l.confidence >= 0.7)
+            .map(l => l.label);
+
+        if (labelsToApply.length > 0) {
+            await addLabelsToIssue(
+                installation.id,
+                repository.owner.login,
+                repository.name,
+                pullRequest.number,
+                labelsToApply
+            );
+        }
+
         return NextResponse.json({
             message: 'PR reviewed successfully',
             pr_number: pullRequest.number,
             security_findings: review.securityScan?.summary.total || 0,
+            labels_applied: labelsToApply,
         });
     } catch (error) {
         console.error('Error processing pull request:', error);
