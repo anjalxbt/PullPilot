@@ -173,9 +173,14 @@ export async function getFileContent(
 ) {
     const token = await getInstallationAccessToken(installationId);
 
+    // URL encode the path (but not the slashes)
+    const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+
     const endpoint = ref
-        ? `/repos/${owner}/${repo}/contents/${path}?ref=${ref}`
-        : `/repos/${owner}/${repo}/contents/${path}`;
+        ? `/repos/${owner}/${repo}/contents/${encodedPath}?ref=${encodeURIComponent(ref)}`
+        : `/repos/${owner}/${repo}/contents/${encodedPath}`;
+
+    console.log(`GitHub getFileContent: ${endpoint}`);
 
     return await githubFetch({
         accessToken: token,
@@ -351,20 +356,43 @@ export async function getFileContentDecoded(
     ref: string
 ): Promise<{ content: string; sha: string } | null> {
     try {
+        console.log(`Fetching file content: ${owner}/${repo}/${path} @ ${ref}`);
         const data = await getFileContent(installationId, owner, repo, path, ref);
 
-        if (!data.content || !data.sha) {
+        if (!data) {
+            console.error('No data returned from getFileContent');
             return null;
         }
 
-        // Decode base64 content
-        const content = Buffer.from(data.content, 'base64').toString('utf8');
+        if (!data.sha) {
+            console.error('No SHA in file content response');
+            return null;
+        }
+
+        // Handle files that don't have content (e.g., large files or directories)
+        if (data.type === 'dir') {
+            console.error('Path is a directory, not a file');
+            return null;
+        }
+
+        if (!data.content) {
+            // For large files, GitHub might not include content
+            console.error('No content in file response. File might be too large or use LFS.');
+            return null;
+        }
+
+        // Decode base64 content (GitHub returns with newlines which need to be removed)
+        const cleanBase64 = data.content.replace(/\n/g, '');
+        const content = Buffer.from(cleanBase64, 'base64').toString('utf8');
+
+        console.log(`Successfully fetched file: ${path} (${content.length} chars)`);
+
         return {
             content,
             sha: data.sha,
         };
-    } catch (error) {
-        console.error('Error getting file content:', error);
+    } catch (error: any) {
+        console.error('Error getting file content:', error?.message || error);
         return null;
     }
 }
@@ -384,11 +412,15 @@ export async function applyFixToFile(
     description: string
 ): Promise<{ success: boolean; commitSha?: string; error?: string }> {
     try {
+        console.log(`Applying fix to ${owner}/${repo}:${branch} - ${filePath}:${lineNumber}`);
+        console.log(`Fix type: ${fixType}, Description: ${description}`);
+
         // Get current file content
         const fileData = await getFileContentDecoded(installationId, owner, repo, filePath, branch);
 
         if (!fileData) {
-            return { success: false, error: 'Could not read file content' };
+            console.error(`Failed to get file content for: ${filePath} @ ${branch}`);
+            return { success: false, error: `Could not read file content: ${filePath} @ ${branch}` };
         }
 
         // Split into lines

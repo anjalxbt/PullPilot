@@ -210,11 +210,15 @@ function parseDiffForFixes(diff: string): Record<string, {
     const fileDiffs = diff.split(/^diff --git/m).filter(Boolean);
 
     for (const fileDiff of fileDiffs) {
-        // Extract filename
+        // Extract filename from git diff format: a/path/to/file b/path/to/file
         const filenameMatch = fileDiff.match(/^\s*a\/(.+?)\s+b\/(.+)/m);
         if (!filenameMatch) continue;
 
-        const filename = filenameMatch[2];
+        // Use the 'b' (new file) path, and remove any leading slash
+        let filename = filenameMatch[2].trim();
+        // Handle potential edge cases with file paths
+        filename = filename.replace(/^\/+/, ''); // Remove leading slashes
+
         result[filename] = { addedLines: [] };
 
         // Parse hunks
