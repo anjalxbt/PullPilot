@@ -441,3 +441,234 @@ export async function getRepositorySecuritySummary(repository_id: string): Promi
         recentFindings: findings as SecurityFindingRecord[],
     };
 }
+
+// ========== FIX SUGGESTIONS ==========
+
+export interface FixSuggestionRecord {
+    id: string;
+    review_id: string;
+    repository_id: string;
+    pr_number: number;
+    pr_branch: string;
+    pr_author: string;
+    fix_type: 'remove_line' | 'replace_line' | 'insert_line';
+    file_path: string;
+    line_number: number;
+    original_content: string | null;
+    replacement_content: string | null;
+    description: string;
+    confidence: number;
+    category: string;
+    status: 'pending' | 'applied' | 'dismissed' | 'expired';
+    applied_at: string | null;
+    applied_by: string | null;
+    commit_sha: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+/**
+ * Store fix suggestions for a PR review
+ */
+export async function storeFixSuggestions(
+    review_id: string,
+    repository_id: string,
+    pr_number: number,
+    pr_branch: string,
+    pr_author: string,
+    suggestions: Array<{
+        id: string;
+        type: 'remove_line' | 'replace_line' | 'insert_line';
+        file: string;
+        line: number;
+        original: string;
+        replacement: string | null;
+        description: string;
+        confidence: number;
+        category: string;
+    }>
+): Promise<FixSuggestionRecord[]> {
+    if (suggestions.length === 0) {
+        return [];
+    }
+
+    const records = suggestions.map(s => ({
+        id: s.id,
+        review_id,
+        repository_id,
+        pr_number,
+        pr_branch,
+        pr_author,
+        fix_type: s.type,
+        file_path: s.file,
+        line_number: s.line,
+        original_content: s.original,
+        replacement_content: s.replacement,
+        description: s.description,
+        confidence: s.confidence,
+        category: s.category,
+        status: 'pending',
+    }));
+
+    const { data, error } = await supabaseAdmin
+        .from('fix_suggestions')
+        .insert(records)
+        .select();
+
+    if (error) {
+        console.error('Error storing fix suggestions:', error);
+        throw error;
+    }
+
+    return data as FixSuggestionRecord[];
+}
+
+/**
+ * Get a single fix suggestion by ID
+ */
+export async function getFixSuggestion(fix_id: string): Promise<FixSuggestionRecord | null> {
+    const { data, error } = await supabaseAdmin
+        .from('fix_suggestions')
+        .select('*')
+        .eq('id', fix_id)
+        .maybeSingle();
+
+    if (error) {
+        console.error('Error fetching fix suggestion:', error);
+        throw error;
+    }
+
+    return data as FixSuggestionRecord | null;
+}
+
+/**
+ * Get fix suggestion with repository info (for authorization)
+ */
+export async function getFixSuggestionWithRepo(fix_id: string): Promise<{
+    fix: FixSuggestionRecord;
+    repository: Repository;
+    installation: GitHubInstallation;
+} | null> {
+    const { data: fix, error: fixError } = await supabaseAdmin
+        .from('fix_suggestions')
+        .select('*')
+        .eq('id', fix_id)
+        .maybeSingle();
+
+    if (fixError || !fix) {
+        console.error('Error fetching fix suggestion:', fixError);
+        return null;
+    }
+
+    const { data: repo, error: repoError } = await supabaseAdmin
+        .from('repositories')
+        .select('*')
+        .eq('id', fix.repository_id)
+        .maybeSingle();
+
+    if (repoError || !repo) {
+        console.error('Error fetching repository:', repoError);
+        return null;
+    }
+
+    const { data: installation, error: installError } = await supabaseAdmin
+        .from('github_installations')
+        .select('*')
+        .eq('id', repo.installation_id)
+        .maybeSingle();
+
+    if (installError || !installation) {
+        console.error('Error fetching installation:', installError);
+        return null;
+    }
+
+    return {
+        fix: fix as FixSuggestionRecord,
+        repository: repo as Repository,
+        installation: installation as GitHubInstallation,
+    };
+}
+
+/**
+ * Mark a fix as applied
+ */
+export async function markFixApplied(
+    fix_id: string,
+    commit_sha: string,
+    applied_by: string
+): Promise<void> {
+    const { error } = await supabaseAdmin
+        .from('fix_suggestions')
+        .update({
+            status: 'applied',
+            applied_at: new Date().toISOString(),
+            applied_by,
+            commit_sha,
+        })
+        .eq('id', fix_id);
+
+    if (error) {
+        console.error('Error marking fix as applied:', error);
+        throw error;
+    }
+}
+
+/**
+ * Mark a fix as dismissed
+ */
+export async function markFixDismissed(fix_id: string): Promise<void> {
+    const { error } = await supabaseAdmin
+        .from('fix_suggestions')
+        .update({
+            status: 'dismissed',
+        })
+        .eq('id', fix_id);
+
+    if (error) {
+        console.error('Error marking fix as dismissed:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get pending fixes for a PR
+ */
+export async function getPendingFixesForPR(
+    repository_id: string,
+    pr_number: number
+): Promise<FixSuggestionRecord[]> {
+    const { data, error } = await supabaseAdmin
+        .from('fix_suggestions')
+        .select('*')
+        .eq('repository_id', repository_id)
+        .eq('pr_number', pr_number)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching pending fixes:', error);
+        throw error;
+    }
+
+    return data as FixSuggestionRecord[];
+}
+
+/**
+ * Expire old pending fixes (e.g., when PR is closed)
+ */
+export async function expireFixesForPR(
+    repository_id: string,
+    pr_number: number
+): Promise<void> {
+    const { error } = await supabaseAdmin
+        .from('fix_suggestions')
+        .update({ status: 'expired' })
+        .eq('repository_id', repository_id)
+        .eq('pr_number', pr_number)
+        .eq('status', 'pending');
+
+    if (error) {
+        console.error('Error expiring fixes:', error);
+        throw error;
+    }
+}

@@ -50,10 +50,24 @@ export interface PullPilotSettings {
     fail_on_error?: boolean;     // Return error status on error-severity rules (default: false)
 }
 
+export interface AutoFixTypesConfig {
+    console_logs?: boolean;        // Remove console.log statements (default: true)
+    unused_imports?: boolean;      // Remove unused imports (default: true)
+    trailing_whitespace?: boolean; // Remove trailing whitespace (default: true)
+    missing_semicolons?: boolean;  // Add missing semicolons (default: false)
+}
+
+export interface AutoFixConfig {
+    enabled?: boolean;           // Enable/disable auto-fix (default: true)
+    types?: AutoFixTypesConfig;  // Which fix types to enable
+    min_confidence?: number;     // Minimum confidence threshold 0-1 (default: 0.8)
+}
+
 export interface PullPilotConfig {
     version: number;
     rules: CustomRule[];
     settings?: PullPilotSettings;
+    auto_fix?: AutoFixConfig;    // Auto-fix configuration (enabled by default)
 }
 
 export interface RuleViolation {

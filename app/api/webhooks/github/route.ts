@@ -7,6 +7,7 @@ import {
     storePRReview,
     storeSecurityFindings,
     updateReviewSecuritySummary,
+    storeFixSuggestions,
 } from '@/lib/repositories';
 import {
     getPullRequest,
@@ -136,16 +137,9 @@ async function handlePullRequestEvent(payload: any) {
             ),
         ]);
 
-        // Analyze PR with AI
-        const review = await analyzePullRequest(
-            pullRequest.title,
-            pullRequest.body || '',
-            prFiles,
-            prDiff
-        );
-
         // Fetch and evaluate custom rules from .pullpilot.yml
         let rulesViolations: any = null;
+        let autoFixConfig: any = undefined;
         try {
             const rulesConfig = await fetchPullPilotConfig(
                 installation.id,
@@ -155,6 +149,9 @@ async function handlePullRequestEvent(payload: any) {
             );
 
             if (rulesConfig) {
+                // Get auto-fix config (enabled by default, can be disabled)
+                autoFixConfig = rulesConfig.auto_fix;
+
                 // Skip if draft PR and config says to ignore drafts
                 if (!(rulesConfig.settings?.ignore_draft_prs && pullRequest.draft)) {
                     const prContext: PRContext = {
@@ -175,6 +172,16 @@ async function handlePullRequestEvent(payload: any) {
             console.error('Error evaluating custom rules:', error);
             // Don't fail the review if rules evaluation fails
         }
+
+        // Analyze PR with AI (pass auto-fix config if available)
+        const review = await analyzePullRequest(
+            pullRequest.title,
+            pullRequest.body || '',
+            prFiles,
+            prDiff,
+            autoFixConfig
+        );
+
 
         // Format and post comment (combine AI review + rules violations)
         let comment = formatReviewComment(review);
@@ -208,6 +215,19 @@ async function handlePullRequestEvent(payload: any) {
         if (review.securityScan && review.securityScan.findings.length > 0) {
             await storeSecurityFindings(prReview.id, review.securityScan.findings);
             await updateReviewSecuritySummary(prReview.id, review.securityScan.summary);
+        }
+
+        // Store fix suggestions if any
+        if (review.fixSuggestions && review.fixSuggestions.length > 0) {
+            await storeFixSuggestions(
+                prReview.id,
+                repoRecord.id,
+                pullRequest.number,
+                pullRequest.head.ref,
+                pullRequest.user.login,
+                review.fixSuggestions
+            );
+            console.log(`Stored ${review.fixSuggestions.length} fix suggestion(s)`);
         }
 
         // Apply auto-labels (only high confidence)

@@ -18,6 +18,14 @@ import {
     LabelSuggestion
 } from './auto-labeler';
 
+import {
+    generateFixSuggestions,
+    formatFixSuggestionsComment,
+    FixSuggestion,
+    AutoFixConfig,
+    getAutoFixConfig,
+} from './fix-generator';
+
 interface PRFile {
     filename: string;
     status: string;
@@ -35,6 +43,7 @@ export interface ReviewResult {
     aiModel: string;
     securityScan: SecurityScanResult;
     suggestedLabels: LabelSuggestion[];
+    fixSuggestions: FixSuggestion[];
 }
 
 /**
@@ -44,7 +53,8 @@ export async function analyzePullRequest(
     prTitle: string,
     prDescription: string,
     files: PRFile[],
-    diff: string
+    diff: string,
+    autoFixConfig?: Partial<AutoFixConfig>
 ): Promise<ReviewResult> {
     // Run security scan
     const securityScan = scanForSecurityIssues(diff, files);
@@ -52,11 +62,15 @@ export async function analyzePullRequest(
     // Run label detection
     const suggestedLabels = detectLabels(prTitle, prDescription, files, diff);
 
+    // Generate fix suggestions (enabled by default)
+    const config = getAutoFixConfig(autoFixConfig);
+    const fixSuggestions = generateFixSuggestions(diff, files, config);
+
     // Check if AI provider is configured
     const openaiKey = process.env.OPENAI_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
-    let baseReview: Omit<ReviewResult, 'securityScan' | 'suggestedLabels'>;
+    let baseReview: Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>;
 
     if (openaiKey) {
         baseReview = await analyzeWithOpenAI(prTitle, prDescription, files, diff);
@@ -71,6 +85,7 @@ export async function analyzePullRequest(
         ...baseReview,
         securityScan,
         suggestedLabels,
+        fixSuggestions,
     };
 }
 
@@ -82,7 +97,7 @@ async function analyzeWithOpenAI(
     prDescription: string,
     files: PRFile[],
     diff: string
-): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels'>> {
+): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -139,7 +154,7 @@ async function analyzeWithAnthropic(
     prDescription: string,
     files: PRFile[],
     diff: string
-): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels'>> {
+): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
     if (!apiKey) {
@@ -239,7 +254,7 @@ Keep your review constructive, specific, and helpful.`;
 /**
  * Parse AI response into structured format
  */
-function parseAIResponse(response: string, model: string): Omit<ReviewResult, 'securityScan' | 'suggestedLabels'> {
+function parseAIResponse(response: string, model: string): Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'> {
     const sections = {
         summary: '',
         highlights: [] as string[],
@@ -305,7 +320,7 @@ function generateBasicReview(
     prTitle: string,
     prDescription: string,
     files: PRFile[]
-): Omit<ReviewResult, 'securityScan' | 'suggestedLabels'> {
+): Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'> {
     const totalAdditions = files.reduce((sum, f) => sum + f.additions, 0);
     const totalDeletions = files.reduce((sum, f) => sum + f.deletions, 0);
     const filesChanged = files.length;
@@ -376,6 +391,12 @@ export function formatReviewComment(review: ReviewResult): string {
         if (appliedLabels) {
             comment += `### 🏷️ Auto-Labels Applied\n${appliedLabels}\n\n`;
         }
+    }
+
+    // Add fix suggestions (enabled by default)
+    if (review.fixSuggestions && review.fixSuggestions.length > 0) {
+        comment += formatFixSuggestionsComment(review.fixSuggestions);
+        comment += `\n\n`;
     }
 
     comment += `---\n*Powered by PullPilot • AI Model: ${review.aiModel}*`;

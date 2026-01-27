@@ -55,3 +55,18 @@ rules:
 settings:
   auto_comment: true
   ignore_draft_prs: true
+
+# Auto-Fix Configuration
+# Auto-fix is ENABLED by default. Only add this section if you want to customize or disable it.
+# auto_fix:
+#   enabled: false  # Set to false to completely disable auto-fix suggestions
+#   
+#   # Fine-tune which fix types are active (all enabled by default except missing_semicolons)
+#   types:
+#     console_logs: true        # Remove console.log/debug/info statements
+#     unused_imports: true      # Remove unused import statements
+#     trailing_whitespace: true # Remove trailing whitespace
+#     missing_semicolons: false # Add missing semicolons (off by default)
+#   
+#   # Minimum confidence threshold (0-1, default: 0.8)
+#   min_confidence: 0.8

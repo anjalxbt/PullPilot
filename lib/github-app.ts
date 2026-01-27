@@ -211,9 +211,6 @@ export async function addLabelsToIssue(
     }
 }
 
-/**
- * Create a label in a repository if it doesn't exist
- */
 export async function createLabel(
     installationId: number,
     owner: string,
@@ -243,3 +240,212 @@ export async function createLabel(
     }
 }
 
+// ========== AUTO-FIX RELATED FUNCTIONS ==========
+
+/**
+ * Get user's permission level for a repository
+ * Returns: 'admin' | 'write' | 'read' | 'none'
+ */
+export async function getUserRepoPermission(
+    installationId: number,
+    owner: string,
+    repo: string,
+    username: string
+): Promise<'admin' | 'write' | 'read' | 'none'> {
+    const token = await getInstallationAccessToken(installationId);
+
+    try {
+        const data = await githubFetch({
+            accessToken: token,
+            endpoint: `/repos/${owner}/${repo}/collaborators/${username}/permission`,
+        });
+        return data.permission || 'none';
+    } catch (error) {
+        console.error('Error checking user permission:', error);
+        return 'none';
+    }
+}
+
+/**
+ * Check if user can apply fixes (is PR author or has write access)
+ */
+export async function canUserApplyFix(
+    installationId: number,
+    owner: string,
+    repo: string,
+    username: string,
+    prAuthor: string
+): Promise<boolean> {
+    // PR author can always apply fixes
+    if (username.toLowerCase() === prAuthor.toLowerCase()) {
+        return true;
+    }
+
+    // Check if user has write or admin access
+    const permission = await getUserRepoPermission(installationId, owner, repo, username);
+    return permission === 'admin' || permission === 'write';
+}
+
+/**
+ * Get the SHA of a file (needed to update it)
+ */
+export async function getFileSha(
+    installationId: number,
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string
+): Promise<string | null> {
+    try {
+        const content = await getFileContent(installationId, owner, repo, path, ref);
+        return content.sha || null;
+    } catch (error) {
+        console.error('Error getting file SHA:', error);
+        return null;
+    }
+}
+
+/**
+ * Update a file in the repository (creates a commit)
+ */
+export async function updateFile(
+    installationId: number,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch: string,
+    sha: string
+): Promise<{ commitSha: string }> {
+    const token = await getInstallationAccessToken(installationId);
+
+    // Content must be base64 encoded
+    const encodedContent = Buffer.from(content).toString('base64');
+
+    const data = await githubFetch({
+        accessToken: token,
+        endpoint: `/repos/${owner}/${repo}/contents/${path}`,
+        method: 'PUT',
+        body: {
+            message,
+            content: encodedContent,
+            branch,
+            sha,
+        },
+    });
+
+    return {
+        commitSha: data.commit?.sha || '',
+    };
+}
+
+/**
+ * Get full file content decoded from base64
+ */
+export async function getFileContentDecoded(
+    installationId: number,
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string
+): Promise<{ content: string; sha: string } | null> {
+    try {
+        const data = await getFileContent(installationId, owner, repo, path, ref);
+
+        if (!data.content || !data.sha) {
+            return null;
+        }
+
+        // Decode base64 content
+        const content = Buffer.from(data.content, 'base64').toString('utf8');
+        return {
+            content,
+            sha: data.sha,
+        };
+    } catch (error) {
+        console.error('Error getting file content:', error);
+        return null;
+    }
+}
+
+/**
+ * Apply a fix by modifying a file and creating a commit
+ */
+export async function applyFixToFile(
+    installationId: number,
+    owner: string,
+    repo: string,
+    branch: string,
+    filePath: string,
+    lineNumber: number,
+    fixType: 'remove_line' | 'replace_line' | 'insert_line',
+    replacement: string | null,
+    description: string
+): Promise<{ success: boolean; commitSha?: string; error?: string }> {
+    try {
+        // Get current file content
+        const fileData = await getFileContentDecoded(installationId, owner, repo, filePath, branch);
+
+        if (!fileData) {
+            return { success: false, error: 'Could not read file content' };
+        }
+
+        // Split into lines
+        const lines = fileData.content.split('\n');
+
+        // Validate line number
+        if (lineNumber < 1 || lineNumber > lines.length) {
+            return { success: false, error: 'Invalid line number' };
+        }
+
+        // Apply the fix
+        const lineIndex = lineNumber - 1;
+
+        switch (fixType) {
+            case 'remove_line':
+                lines.splice(lineIndex, 1);
+                break;
+            case 'replace_line':
+                if (replacement !== null) {
+                    lines[lineIndex] = replacement;
+                }
+                break;
+            case 'insert_line':
+                if (replacement !== null) {
+                    lines.splice(lineIndex, 0, replacement);
+                }
+                break;
+        }
+
+        // Rejoin lines
+        const newContent = lines.join('\n');
+
+        // Create commit
+        const commitMessage = `fix: ${description} (PullPilot auto-fix)
+
+Applied automatic fix to ${filePath}:${lineNumber}`;
+
+        const result = await updateFile(
+            installationId,
+            owner,
+            repo,
+            filePath,
+            newContent,
+            commitMessage,
+            branch,
+            fileData.sha
+        );
+
+        return {
+            success: true,
+            commitSha: result.commitSha,
+        };
+    } catch (error: any) {
+        console.error('Error applying fix:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to apply fix',
+        };
+    }
+}
