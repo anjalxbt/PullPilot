@@ -33,14 +33,15 @@ export async function GET(request: NextRequest) {
         // Get session (user must be logged in)
         const session = await getServerSession(authOptions);
 
-        if (!session?.user?.name) {
+        // Use username (GitHub login) for authorization - NOT name (display name)
+        const username = (session?.user as any)?.username || session?.user?.name;
+
+        if (!username) {
             // Redirect to login with callback to this URL
             const loginUrl = new URL('/api/auth/signin', request.url);
             loginUrl.searchParams.set('callbackUrl', request.url);
             return NextResponse.redirect(loginUrl);
         }
-
-        const username = session.user.name;
 
         // Get fix details with repository info
         const fixData = await getFixSuggestionWithRepo(fixId);
@@ -70,6 +71,18 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // Log details for debugging
+        console.log('Apply fix request:', {
+            fixId,
+            username,
+            prAuthor: fix.pr_author,
+            owner: repository.owner_login,
+            repo: repository.repo_name,
+            branch: fix.pr_branch,
+            filePath: fix.file_path,
+            installationId: installation.installation_id
+        });
+
         // Check authorization: user must be PR author or have write access
         const canApply = await canUserApplyFix(
             installation.installation_id,
@@ -79,6 +92,8 @@ export async function GET(request: NextRequest) {
             fix.pr_author
         );
 
+        console.log('Authorization result:', { canApply, username, prAuthor: fix.pr_author });
+
         if (!canApply) {
             return NextResponse.json(
                 {
@@ -86,6 +101,8 @@ export async function GET(request: NextRequest) {
                     details: {
                         user: username,
                         prAuthor: fix.pr_author,
+                        owner: repository.owner_login,
+                        repo: repository.repo_name,
                     }
                 },
                 { status: 403 }
@@ -93,6 +110,7 @@ export async function GET(request: NextRequest) {
         }
 
         // Apply the fix
+        console.log('Applying fix to file:', fix.file_path, '@', fix.pr_branch);
         const result = await applyFixToFile(
             installation.installation_id,
             repository.owner_login,
@@ -104,6 +122,8 @@ export async function GET(request: NextRequest) {
             fix.replacement_content,
             fix.description
         );
+
+        console.log('Apply fix result:', result);
 
         if (!result.success) {
             return NextResponse.json(
