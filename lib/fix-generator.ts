@@ -301,7 +301,8 @@ export function formatFixSuggestionsComment(
     ];
 
     for (const fix of suggestions) {
-        const fixUrl = `${baseUrl}/api/github/apply-fix?id=${fix.id}`;
+        // Use the /fix/ page for a better UX instead of API directly
+        const fixUrl = `${baseUrl}/fix?id=${fix.id}`;
         const description = fix.description;
         const file = `\`${fix.file}\``;
         const line = fix.line.toString();
