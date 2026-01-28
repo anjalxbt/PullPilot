@@ -144,15 +144,14 @@ export default function FixPageContent() {
                             <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <span className="text-4xl">✅</span>
                             </div>
-                            <h2 className="text-xl font-semibold text-white mb-2">Fix Applied Successfully!</h2>
+                            <h2 className="text-xl font-semibold text-white mb-2">Suggestion Posted!</h2>
                             <p className="text-gray-400 mb-4">
-                                A commit has been created with the fix.
+                                A fix suggestion has been added to the PR as a comment.
                             </p>
-                            {result?.commitSha && (
-                                <p className="text-sm text-gray-500 mb-4">
-                                    Commit: <code className="text-blue-400">{result.commitSha.slice(0, 7)}</code>
-                                </p>
-                            )}
+                            <div className="bg-gray-900/50 rounded-lg p-4 text-left text-sm text-gray-400 mb-4">
+                                <p className="mb-2"><strong>Next step:</strong></p>
+                                <p>Click <span className="text-blue-400 font-medium">&quot;Apply suggestion&quot;</span> in the PR to apply the fix with one click.</p>
+                            </div>
                             {result?.prUrl && (
                                 <div className="space-y-2">
                                     <p className="text-sm text-gray-400">Redirecting to PR in 3 seconds...</p>

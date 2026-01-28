@@ -292,6 +292,115 @@ export async function canUserApplyFix(
 }
 
 /**
+ * Post a fix suggestion as a PR review comment with GitHub's suggestion syntax
+ * This allows anyone to apply the fix with one click, regardless of fork status
+ */
+export async function postFixSuggestionComment(
+    installationId: number,
+    owner: string,
+    repo: string,
+    prNumber: number,
+    commitSha: string,
+    filePath: string,
+    lineNumber: number,
+    fixType: 'remove_line' | 'replace_line' | 'insert_line',
+    originalContent: string | null,
+    replacementContent: string | null,
+    description: string
+): Promise<{ success: boolean; commentId?: number; error?: string }> {
+    const token = await getInstallationAccessToken(installationId);
+
+    try {
+        // Build the suggestion body based on fix type
+        let suggestionBody: string;
+
+        if (fixType === 'remove_line') {
+            // For removal, suggest empty replacement
+            suggestionBody = `### 🔧 Auto-Fix Suggestion
+
+${description}
+
+\`\`\`suggestion
+\`\`\`
+
+> Click **"Apply suggestion"** above to remove this line.`;
+        } else if (fixType === 'replace_line' && replacementContent) {
+            // For replacement, show the new content
+            suggestionBody = `### 🔧 Auto-Fix Suggestion
+
+${description}
+
+\`\`\`suggestion
+${replacementContent}
+\`\`\`
+
+> Click **"Apply suggestion"** above to apply this fix.`;
+        } else {
+            return {
+                success: false,
+                error: `Unsupported fix type: ${fixType}`
+            };
+        }
+
+        // Create a single-comment review
+        const reviewData = await githubFetch({
+            accessToken: token,
+            endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+            method: 'POST',
+            body: {
+                commit_id: commitSha,
+                event: 'COMMENT',
+                comments: [
+                    {
+                        path: filePath,
+                        line: lineNumber,
+                        body: suggestionBody,
+                    }
+                ]
+            }
+        });
+
+        console.log(`Posted fix suggestion comment on ${owner}/${repo}#${prNumber} at ${filePath}:${lineNumber}`);
+
+        return {
+            success: true,
+            commentId: reviewData.id
+        };
+
+    } catch (error: any) {
+        console.error('Error posting fix suggestion comment:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to post suggestion comment'
+        };
+    }
+}
+
+/**
+ * Get the latest commit SHA for a pull request
+ */
+export async function getPRHeadSha(
+    installationId: number,
+    owner: string,
+    repo: string,
+    prNumber: number
+): Promise<string | null> {
+    const token = await getInstallationAccessToken(installationId);
+
+    try {
+        const prData = await githubFetch({
+            accessToken: token,
+            endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}`,
+        });
+
+        return prData.head?.sha || null;
+    } catch (error) {
+        console.error('Error getting PR head SHA:', error);
+        return null;
+    }
+}
+
+/**
  * Get the SHA of a file (needed to update it)
  */
 export async function getFileSha(

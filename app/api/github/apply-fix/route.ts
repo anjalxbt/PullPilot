@@ -7,16 +7,21 @@ import {
 } from '@/lib/repositories';
 import {
     canUserApplyFix,
-    applyFixToFile,
-    postPRComment,
+    postFixSuggestionComment,
+    getPRHeadSha,
 } from '@/lib/github-app';
 
 /**
- * Apply a fix suggestion to a PR
+ * Apply a fix suggestion to a PR using GitHub's suggestion comment feature
+ * 
+ * This approach:
+ * - Works for fork PRs without needing app installation on the fork
+ * - Shows the fix as a reviewable suggestion in the PR
+ * - PR author can apply with one click using GitHub's built-in "Apply suggestion" button
  * 
  * GET /api/github/apply-fix?id={fixId}
  * 
- * Authorization: Only PR author or repo maintainers can apply fixes
+ * Authorization: Only PR author or repo maintainers can post suggestions
  */
 export async function GET(request: NextRequest) {
     try {
@@ -58,16 +63,11 @@ export async function GET(request: NextRequest) {
         // Check if already applied
         if (fix.status === 'applied') {
             return NextResponse.json(
-                { error: 'Fix has already been applied', commitSha: fix.commit_sha },
-                { status: 409 }
-            );
-        }
-
-        // Check if expired or dismissed
-        if (fix.status !== 'pending') {
-            return NextResponse.json(
-                { error: `Fix is ${fix.status}` },
-                { status: 410 }
+                {
+                    error: 'This fix has already been applied',
+                    prUrl: `https://github.com/${repository.repo_full_name}/pull/${fix.pr_number}`
+                },
+                { status: 400 }
             );
         }
 
@@ -78,8 +78,9 @@ export async function GET(request: NextRequest) {
             prAuthor: fix.pr_author,
             owner: repository.owner_login,
             repo: repository.repo_name,
-            branch: fix.pr_branch,
+            prNumber: fix.pr_number,
             filePath: fix.file_path,
+            lineNumber: fix.line_number,
             installationId: installation.installation_id
         });
 
@@ -109,50 +110,50 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        // For fork PRs, use the head repo (fork) owner and name
-        // If head_repo_owner is set, this is a fork PR
-        const targetOwner = fix.head_repo_owner || repository.owner_login;
-        const targetRepo = fix.head_repo_name || repository.repo_name;
-
-        // Apply the fix
-        console.log('Applying fix to file:', fix.file_path, '@', fix.pr_branch, 'in', targetOwner + '/' + targetRepo);
-        const result = await applyFixToFile(
+        // Get the latest commit SHA for the PR (needed for suggestion comments)
+        const headSha = await getPRHeadSha(
             installation.installation_id,
-            targetOwner,
-            targetRepo,
-            fix.pr_branch,
-            fix.file_path,
-            fix.line_number,
-            fix.fix_type,
-            fix.replacement_content,
-            fix.description
+            repository.owner_login,
+            repository.repo_name,
+            fix.pr_number
         );
 
-        console.log('Apply fix result:', result);
-
-        if (!result.success) {
+        if (!headSha) {
             return NextResponse.json(
-                { error: result.error || 'Failed to apply fix' },
-                { status: 500 }
+                { error: 'Could not get PR head commit. The PR may have been closed.' },
+                { status: 400 }
             );
         }
 
-        // Mark fix as applied in database
-        await markFixApplied(fixId, result.commitSha!, username);
-
-        // Post a comment on the PR
-        await postPRComment(
+        // Post a suggestion comment on the PR
+        console.log('Posting suggestion comment:', fix.file_path, '@', fix.line_number);
+        const result = await postFixSuggestionComment(
             installation.installation_id,
             repository.owner_login,
             repository.repo_name,
             fix.pr_number,
-            `✅ **Auto-fix applied** by @${username}\n\n` +
-            `**Fix:** ${fix.description}\n` +
-            `**File:** \`${fix.file_path}\`\n` +
-            `**Commit:** ${result.commitSha}`
+            headSha,
+            fix.file_path,
+            fix.line_number,
+            fix.fix_type,
+            fix.original_content,
+            fix.replacement_content,
+            fix.description
         );
 
-        // Return success response (redirect to PR for web users)
+        console.log('Post suggestion result:', result);
+
+        if (!result.success) {
+            return NextResponse.json(
+                { error: result.error || 'Failed to post suggestion' },
+                { status: 500 }
+            );
+        }
+
+        // Mark fix as applied in database (applied = suggestion posted)
+        await markFixApplied(fixId, `suggestion-${result.commentId}`, username);
+
+        // Return success response
         const prUrl = `https://github.com/${repository.repo_full_name}/pull/${fix.pr_number}`;
 
         // Check if this is an API request or browser request
@@ -160,8 +161,8 @@ export async function GET(request: NextRequest) {
         if (accept.includes('application/json')) {
             return NextResponse.json({
                 success: true,
-                message: 'Fix applied successfully',
-                commitSha: result.commitSha,
+                message: 'Fix suggestion posted! Click "Apply suggestion" in the PR to apply.',
+                commentId: result.commentId,
                 prUrl,
             });
         }
@@ -178,37 +179,7 @@ export async function GET(request: NextRequest) {
     }
 }
 
-/**
- * POST endpoint for API-style requests
- */
+// Also support POST for explicit form submissions
 export async function POST(request: NextRequest) {
-    try {
-        const body = await request.json();
-        const fixId = body.fixId || body.id;
-
-        if (!fixId) {
-            return NextResponse.json(
-                { error: 'Missing fixId in request body' },
-                { status: 400 }
-            );
-        }
-
-        // Create a URL with the fix ID and call GET handler logic
-        const url = new URL(request.url);
-        url.searchParams.set('id', fixId);
-
-        // Reuse GET logic by creating a new request
-        const getRequest = new NextRequest(url, {
-            headers: request.headers,
-        });
-
-        return GET(getRequest);
-
-    } catch (error: any) {
-        console.error('Error in POST apply-fix:', error);
-        return NextResponse.json(
-            { error: error.message || 'Invalid request' },
-            { status: 400 }
-        );
-    }
+    return GET(request);
 }
