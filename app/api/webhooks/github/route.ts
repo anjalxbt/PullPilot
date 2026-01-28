@@ -219,15 +219,21 @@ async function handlePullRequestEvent(payload: any) {
 
         // Store fix suggestions if any
         if (review.fixSuggestions && review.fixSuggestions.length > 0) {
+            // pullRequest.head.repo contains the fork info for fork PRs
+            const headRepoOwner = pullRequest.head.repo?.owner?.login;
+            const headRepoName = pullRequest.head.repo?.name;
+
             await storeFixSuggestions(
                 prReview.id,
                 repoRecord.id,
                 pullRequest.number,
                 pullRequest.head.ref,
                 pullRequest.user.login,
-                review.fixSuggestions
+                review.fixSuggestions,
+                headRepoOwner,  // For fork PRs, this is the fork owner
+                headRepoName    // For fork PRs, this is the fork repo name
             );
-            console.log(`Stored ${review.fixSuggestions.length} fix suggestion(s)`);
+            console.log(`Stored ${review.fixSuggestions.length} fix suggestion(s) for ${headRepoOwner}/${headRepoName}:${pullRequest.head.ref}`);
         }
 
         // Apply auto-labels (only high confidence)

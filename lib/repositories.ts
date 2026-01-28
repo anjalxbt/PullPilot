@@ -451,6 +451,9 @@ export interface FixSuggestionRecord {
     pr_number: number;
     pr_branch: string;
     pr_author: string;
+    // For fork PRs - where the branch actually lives
+    head_repo_owner: string | null;
+    head_repo_name: string | null;
     fix_type: 'remove_line' | 'replace_line' | 'insert_line';
     file_path: string;
     line_number: number;
@@ -486,7 +489,10 @@ export async function storeFixSuggestions(
         description: string;
         confidence: number;
         category: string;
-    }>
+    }>,
+    // For fork PRs - the repo where the branch exists
+    head_repo_owner?: string,
+    head_repo_name?: string
 ): Promise<FixSuggestionRecord[]> {
     if (suggestions.length === 0) {
         return [];
@@ -499,6 +505,8 @@ export async function storeFixSuggestions(
         pr_number,
         pr_branch,
         pr_author,
+        head_repo_owner: head_repo_owner || null,
+        head_repo_name: head_repo_name || null,
         fix_type: s.type,
         file_path: s.file,
         line_number: s.line,

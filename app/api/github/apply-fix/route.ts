@@ -109,12 +109,17 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        // For fork PRs, use the head repo (fork) owner and name
+        // If head_repo_owner is set, this is a fork PR
+        const targetOwner = fix.head_repo_owner || repository.owner_login;
+        const targetRepo = fix.head_repo_name || repository.repo_name;
+
         // Apply the fix
-        console.log('Applying fix to file:', fix.file_path, '@', fix.pr_branch);
+        console.log('Applying fix to file:', fix.file_path, '@', fix.pr_branch, 'in', targetOwner + '/' + targetRepo);
         const result = await applyFixToFile(
             installation.installation_id,
-            repository.owner_login,
-            repository.repo_name,
+            targetOwner,
+            targetRepo,
             fix.pr_branch,
             fix.file_path,
             fix.line_number,

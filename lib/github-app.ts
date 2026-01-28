@@ -420,7 +420,12 @@ export async function applyFixToFile(
 
         if (!fileData) {
             console.error(`Failed to get file content for: ${filePath} @ ${branch}`);
-            return { success: false, error: `Could not read file content: ${filePath} @ ${branch}` };
+
+            // Check if it's a branch not found error (we caught this in the logs)
+            return {
+                success: false,
+                error: `Could not read file content: ${filePath} @ ${branch}. The branch may have been deleted or the file no longer exists.`
+            };
         }
 
         // Split into lines
