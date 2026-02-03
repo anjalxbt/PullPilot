@@ -76,23 +76,41 @@ export async function analyzePullRequest(
     const config = getAutoFixConfig(autoFixConfig);
     const fixSuggestions = generateFixSuggestions(diff, files, config);
 
-    // Check if AI provider is configured
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    const geminiConfigured = isGeminiConfigured();
+    // Build list of available AI providers in priority order
+    type ProviderFn = () => Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>>;
+    const providers: { name: string; fn: ProviderFn }[] = [];
 
-    let baseReview: Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>;
+    if (process.env.OPENAI_API_KEY) {
+        providers.push({ name: 'OpenAI', fn: () => analyzeWithOpenAI(prTitle, prDescription, files, diff) });
+    }
+    if (process.env.ANTHROPIC_API_KEY) {
+        providers.push({ name: 'Anthropic', fn: () => analyzeWithAnthropic(prTitle, prDescription, files, diff) });
+    }
+    if (isGeminiConfigured()) {
+        providers.push({ name: 'Gemini', fn: () => analyzeWithGemini(prTitle, prDescription, files, diff) });
+    }
+    if (isGroqConfigured()) {
+        providers.push({ name: 'Groq', fn: () => analyzeWithGroq(prTitle, prDescription, files, diff) });
+    }
 
-    if (openaiKey) {
-        baseReview = await analyzeWithOpenAI(prTitle, prDescription, files, diff);
-    } else if (anthropicKey) {
-        baseReview = await analyzeWithAnthropic(prTitle, prDescription, files, diff);
-    } else if (geminiConfigured) {
-        baseReview = await analyzeWithGemini(prTitle, prDescription, files, diff);
-    } else if (isGroqConfigured()) {
-        baseReview = await analyzeWithGroq(prTitle, prDescription, files, diff);
-    } else {
-        // Fallback to basic analysis without AI
+    // Try each provider in sequence, fallback to next on failure
+    let baseReview: Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'> | null = null;
+
+    for (const provider of providers) {
+        try {
+            console.log(`Trying AI provider: ${provider.name}`);
+            baseReview = await provider.fn();
+            console.log(`Successfully used AI provider: ${provider.name}`);
+            break; // Success, exit loop
+        } catch (error) {
+            console.error(`Error with ${provider.name}, trying next provider:`, error);
+            // Continue to next provider
+        }
+    }
+
+    // If all providers failed or none configured, use basic review
+    if (!baseReview) {
+        console.log('All AI providers failed or none configured, using basic review');
         baseReview = generateBasicReview(prTitle, prDescription, files);
     }
 
@@ -156,8 +174,7 @@ async function analyzeWithOpenAI(
         return parseAIResponse(analysis, 'gpt-4o-mini');
     } catch (error) {
         console.error('Error calling OpenAI:', error);
-        // Fallback to basic review
-        return generateBasicReview(prTitle, prDescription, files);
+        throw error; // Re-throw to allow failover to next provider
     }
 }
 
@@ -209,8 +226,7 @@ async function analyzeWithAnthropic(
         return parseAIResponse(analysis, 'claude-3-5-sonnet');
     } catch (error) {
         console.error('Error calling Anthropic:', error);
-        // Fallback to basic review
-        return generateBasicReview(prTitle, prDescription, files);
+        throw error; // Re-throw to allow failover to next provider
     }
 }
 
@@ -239,8 +255,7 @@ async function analyzeWithGemini(
         return parseAIResponse(analysis, 'gemini-2.0-flash');
     } catch (error) {
         console.error('Error calling Gemini:', error);
-        // Fallback to basic review
-        return generateBasicReview(prTitle, prDescription, files);
+        throw error; // Re-throw to allow failover to next provider
     }
 }
 
@@ -269,8 +284,7 @@ async function analyzeWithGroq(
         return parseAIResponse(analysis, 'openai/gpt-oss-120b');
     } catch (error) {
         console.error('Error calling Groq:', error);
-        // Fallback to basic review
-        return generateBasicReview(prTitle, prDescription, files);
+        throw error; // Re-throw to allow failover to next provider
     }
 }
 
