@@ -2,7 +2,7 @@
  * AI-powered Pull Request Reviewer
  * 
  * This module analyzes pull request diffs and generates review summaries.
- * You can integrate with OpenAI, Anthropic, or other AI providers.
+ * You can integrate with OpenAI, Anthropic, Gemini, or other AI providers.
  */
 
 import {
@@ -25,6 +25,11 @@ import {
     AutoFixConfig,
     getAutoFixConfig,
 } from './fix-generator';
+
+import {
+    isGeminiConfigured,
+    generateContentWithSystem,
+} from './gemini';
 
 interface PRFile {
     filename: string;
@@ -69,6 +74,7 @@ export async function analyzePullRequest(
     // Check if AI provider is configured
     const openaiKey = process.env.OPENAI_API_KEY;
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    const geminiConfigured = isGeminiConfigured();
 
     let baseReview: Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>;
 
@@ -76,6 +82,8 @@ export async function analyzePullRequest(
         baseReview = await analyzeWithOpenAI(prTitle, prDescription, files, diff);
     } else if (anthropicKey) {
         baseReview = await analyzeWithAnthropic(prTitle, prDescription, files, diff);
+    } else if (geminiConfigured) {
+        baseReview = await analyzeWithGemini(prTitle, prDescription, files, diff);
     } else {
         // Fallback to basic analysis without AI
         baseReview = generateBasicReview(prTitle, prDescription, files);
@@ -194,6 +202,36 @@ async function analyzeWithAnthropic(
         return parseAIResponse(analysis, 'claude-3-5-sonnet');
     } catch (error) {
         console.error('Error calling Anthropic:', error);
+        // Fallback to basic review
+        return generateBasicReview(prTitle, prDescription, files);
+    }
+}
+
+/**
+ * Analyze with Google Gemini
+ */
+async function analyzeWithGemini(
+    prTitle: string,
+    prDescription: string,
+    files: PRFile[],
+    diff: string
+): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff);
+    const systemInstruction = 'You are an expert code reviewer. Analyze pull requests and provide constructive feedback.';
+
+    try {
+        const analysis = await generateContentWithSystem(
+            systemInstruction,
+            prompt,
+            {
+                temperature: 0.3,
+                maxOutputTokens: 1500,
+            }
+        );
+
+        return parseAIResponse(analysis, 'gemini-2.0-flash');
+    } catch (error) {
+        console.error('Error calling Gemini:', error);
         // Fallback to basic review
         return generateBasicReview(prTitle, prDescription, files);
     }
