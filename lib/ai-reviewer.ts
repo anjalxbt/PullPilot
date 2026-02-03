@@ -31,6 +31,11 @@ import {
     generateContentWithSystem,
 } from './gemini';
 
+import {
+    isGroqConfigured,
+    generateContentWithSystem as generateGroqContent,
+} from './groq';
+
 interface PRFile {
     filename: string;
     status: string;
@@ -84,6 +89,8 @@ export async function analyzePullRequest(
         baseReview = await analyzeWithAnthropic(prTitle, prDescription, files, diff);
     } else if (geminiConfigured) {
         baseReview = await analyzeWithGemini(prTitle, prDescription, files, diff);
+    } else if (isGroqConfigured()) {
+        baseReview = await analyzeWithGroq(prTitle, prDescription, files, diff);
     } else {
         // Fallback to basic analysis without AI
         baseReview = generateBasicReview(prTitle, prDescription, files);
@@ -232,6 +239,36 @@ async function analyzeWithGemini(
         return parseAIResponse(analysis, 'gemini-2.0-flash');
     } catch (error) {
         console.error('Error calling Gemini:', error);
+        // Fallback to basic review
+        return generateBasicReview(prTitle, prDescription, files);
+    }
+}
+
+/**
+ * Analyze with Groq
+ */
+async function analyzeWithGroq(
+    prTitle: string,
+    prDescription: string,
+    files: PRFile[],
+    diff: string
+): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff);
+    const systemInstruction = 'You are an expert code reviewer. Analyze pull requests and provide constructive feedback.';
+
+    try {
+        const analysis = await generateGroqContent(
+            systemInstruction,
+            prompt,
+            {
+                temperature: 0.3,
+                maxTokens: 1500,
+            }
+        );
+
+        return parseAIResponse(analysis, 'openai/gpt-oss-120b');
+    } catch (error) {
+        console.error('Error calling Groq:', error);
         // Fallback to basic review
         return generateBasicReview(prTitle, prDescription, files);
     }
