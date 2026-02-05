@@ -11,7 +11,7 @@ import {
     SecuritySeverity,
     SecurityCategory,
     getSeverityPriority
-} from './security-rules';
+} from './patterns';
 
 export interface SecurityFinding {
     ruleId: string;
