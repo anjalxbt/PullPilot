@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { githubFetch } from './github-fetch';
+import { SecurityFinding, formatInlineSecurityBody } from './security-scanner';
 
 /**
  * Generate a JWT for GitHub App authentication
@@ -159,6 +160,71 @@ export async function getInstallationRepos(installationId: number) {
         accessToken: token,
         endpoint: `/installation/repositories`,
     });
+}
+
+/**
+ * Post security scan findings as inline review comments on specific code lines.
+ * Creates a single PR review with multiple inline comments.
+ */
+export async function postSecurityReviewComments(
+    installationId: number,
+    owner: string,
+    repo: string,
+    prNumber: number,
+    commitSha: string,
+    findings: SecurityFinding[]
+): Promise<{ success: boolean; reviewId?: number; error?: string }> {
+    const token = await getInstallationAccessToken(installationId);
+
+    try {
+        // Separate findings that have valid file+line from those that don't
+        const inlineFindings = findings.filter(f => f.file && f.line);
+        const orphanFindings = findings.filter(f => !f.file || !f.line);
+
+        // Build the inline comments array
+        const comments = inlineFindings.map(finding => ({
+            path: finding.file,
+            line: finding.line!,
+            body: formatInlineSecurityBody(finding),
+        }));
+
+        // Build the review body (summary + any orphan findings)
+        let reviewBody = `## 🔒 Security Scan — ${findings.length} issue(s) found\n\n`;
+        reviewBody += `📍 Each issue is commented inline on the affected code line.\n`;
+
+        if (orphanFindings.length > 0) {
+            reviewBody += `\n### Additional Findings (no specific line)\n\n`;
+            for (const finding of orphanFindings) {
+                reviewBody += formatInlineSecurityBody(finding) + '\n';
+            }
+        }
+
+        // Create a review with all inline comments
+        const reviewData = await githubFetch({
+            accessToken: token,
+            endpoint: `/repos/${owner}/${repo}/pulls/${prNumber}/reviews`,
+            method: 'POST',
+            body: {
+                commit_id: commitSha,
+                event: 'COMMENT',
+                body: reviewBody,
+                comments: comments,
+            },
+        });
+
+        console.log(`Posted ${comments.length} inline security comment(s) on ${owner}/${repo}#${prNumber}`);
+
+        return {
+            success: true,
+            reviewId: reviewData.id,
+        };
+    } catch (error: any) {
+        console.error('Error posting security review comments:', error);
+        return {
+            success: false,
+            error: error.message || 'Failed to post security review comments',
+        };
+    }
 }
 
 /**

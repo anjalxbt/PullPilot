@@ -7,7 +7,7 @@
 
 import {
     scanForSecurityIssues,
-    formatSecurityComment,
+    formatSecuritySummaryLine,
     SecurityScanResult,
     SecurityFinding
 } from './security-scanner';
@@ -436,9 +436,9 @@ function generateBasicReview(
 export function formatReviewComment(review: ReviewResult): string {
     let comment = `## 🤖 AI Code Review\n\n`;
 
-    // Add security scan results first if there are findings
+    // Add security scan summary (detailed findings are posted as inline comments)
     if (review.securityScan && review.securityScan.findings.length > 0) {
-        comment += formatSecurityComment(review.securityScan);
+        comment += formatSecuritySummaryLine(review.securityScan);
         comment += `\n\n`;
     } else if (review.securityScan) {
         comment += `## 🔒 Security Scan\n\n✅ No security issues detected!\n\n`;

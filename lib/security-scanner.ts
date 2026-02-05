@@ -48,6 +48,11 @@ interface PRFile {
     patch?: string;
 }
 
+interface ParsedFileChange {
+    content: string;
+    lineMap: Map<number, number>; // content-relative line number -> actual file line number
+}
+
 /**
  * Scan PR diff for security vulnerabilities
  */
@@ -58,12 +63,23 @@ export function scanForSecurityIssues(
     const startTime = Date.now();
     const findings: SecurityFinding[] = [];
 
-    // Parse diff to get file-specific changes
+    // Parse diff to get file-specific changes with actual line number mapping
     const fileChanges = parseDiff(diff);
 
     // Scan each file's changes
-    for (const [filename, content] of Object.entries(fileChanges)) {
-        const fileFindings = scanFileContent(filename, content);
+    for (const [filename, parsed] of Object.entries(fileChanges)) {
+        const fileFindings = scanFileContent(filename, parsed.content);
+
+        // Map content-relative line numbers to actual file line numbers
+        for (const finding of fileFindings) {
+            if (finding.line !== undefined) {
+                const actualLine = parsed.lineMap.get(finding.line);
+                if (actualLine !== undefined) {
+                    finding.line = actualLine;
+                }
+            }
+        }
+
         findings.push(...fileFindings);
     }
 
@@ -84,38 +100,67 @@ export function scanForSecurityIssues(
 }
 
 /**
- * Parse unified diff format to extract file contents
+ * Parse unified diff format to extract file contents with actual line number mapping.
+ * Returns a map of filename -> { content (added lines joined), lineMap (content line -> actual file line) }
  */
-function parseDiff(diff: string): Record<string, string> {
-    const fileChanges: Record<string, string> = {};
+function parseDiff(diff: string): Record<string, ParsedFileChange> {
+    const fileChanges: Record<string, ParsedFileChange> = {};
     const lines = diff.split('\n');
 
     let currentFile = '';
-    let content: string[] = [];
+    let contentLines: string[] = [];
+    let lineMap = new Map<number, number>();
+    let currentNewLine = 0; // Tracks the current line number in the new file (right side)
 
     for (const line of lines) {
         // New file header
         if (line.startsWith('diff --git')) {
             // Save previous file
-            if (currentFile && content.length > 0) {
-                fileChanges[currentFile] = content.join('\n');
+            if (currentFile && contentLines.length > 0) {
+                fileChanges[currentFile] = {
+                    content: contentLines.join('\n'),
+                    lineMap: lineMap,
+                };
             }
             // Extract filename from: diff --git a/path/file b/path/file
             const match = line.match(/diff --git a\/(.*) b\/(.*)/);
             if (match) {
                 currentFile = match[2];
             }
-            content = [];
+            contentLines = [];
+            lineMap = new Map<number, number>();
+            currentNewLine = 0;
         }
-        // Only include added lines (lines starting with +, but not +++)
+        // Hunk header: @@ -oldStart,oldCount +newStart,newCount @@
+        else if (line.startsWith('@@')) {
+            const hunkMatch = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+            if (hunkMatch) {
+                currentNewLine = parseInt(hunkMatch[1], 10);
+            }
+        }
+        // Added lines (lines starting with +, but not +++)
         else if (line.startsWith('+') && !line.startsWith('+++')) {
-            content.push(line.substring(1)); // Remove the + prefix
+            contentLines.push(line.substring(1)); // Remove the + prefix
+            // Map 1-based content line number to actual file line number
+            lineMap.set(contentLines.length, currentNewLine);
+            currentNewLine++;
         }
+        // Context lines (unchanged, present in both old and new)
+        else if (!line.startsWith('-') && !line.startsWith('---') && !line.startsWith('\\')) {
+            // Context lines advance the new-file line counter but are not added to content
+            if (currentNewLine > 0) {
+                currentNewLine++;
+            }
+        }
+        // Deleted lines (starting with -) don't advance newLine counter
     }
 
     // Save last file
-    if (currentFile && content.length > 0) {
-        fileChanges[currentFile] = content.join('\n');
+    if (currentFile && contentLines.length > 0) {
+        fileChanges[currentFile] = {
+            content: contentLines.join('\n'),
+            lineMap: lineMap,
+        };
     }
 
     return fileChanges;
@@ -341,4 +386,56 @@ function formatFinding(finding: SecurityFinding): string {
  */
 export function hasBlockingIssues(result: SecurityScanResult): boolean {
     return result.summary.critical > 0 || result.summary.high > 0;
+}
+
+/**
+ * Format a single security finding as an inline review comment body
+ */
+export function formatInlineSecurityBody(finding: SecurityFinding): string {
+    const severityEmoji: Record<string, string> = {
+        critical: '🔴',
+        high: '🟠',
+        medium: '🟡',
+        low: '🟢',
+    };
+    const emoji = severityEmoji[finding.severity] || '⚪';
+
+    let body = `### ${emoji} Security Issue: ${finding.ruleName}\n\n`;
+    body += `**Severity:** ${finding.severity.toUpperCase()} | **Rule:** \`${finding.ruleId}\` | **Category:** ${finding.category}\n\n`;
+    body += `> ${finding.message}\n`;
+    if (finding.snippet) {
+        body += `\n\`\`\`\n${finding.snippet}\n\`\`\`\n`;
+    }
+
+    return body;
+}
+
+/**
+ * Format a brief security summary line for the main PR comment
+ */
+export function formatSecuritySummaryLine(result: SecurityScanResult): string {
+    if (result.findings.length === 0) {
+        return `## 🔒 Security Scan\n\n✅ **No security issues detected!**\n\nScanned ${result.scannedFiles} file(s) in ${result.scanTime}ms.`;
+    }
+
+    const { summary } = result;
+    let line = `## 🔒 Security Scan Results\n\n`;
+
+    if (summary.critical > 0) {
+        line += `🔴 **${summary.critical} Critical** `;
+    }
+    if (summary.high > 0) {
+        line += `🟠 **${summary.high} High** `;
+    }
+    if (summary.medium > 0) {
+        line += `🟡 **${summary.medium} Medium** `;
+    }
+    if (summary.low > 0) {
+        line += `🟢 **${summary.low} Low** `;
+    }
+
+    line += `\n\n📍 **${summary.total} issue(s) found** — see inline comments on the code for details.\n`;
+    line += `\n*Security scan completed in ${result.scanTime}ms • ${result.scannedFiles} file(s) scanned*`;
+
+    return line;
 }

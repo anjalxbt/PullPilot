@@ -14,6 +14,8 @@ import {
     getPullRequestFiles,
     getPullRequestDiff,
     postPRComment,
+    postSecurityReviewComments,
+    getPRHeadSha,
     addLabelsToIssue,
 } from '@/lib/github-app';
 import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
@@ -197,6 +199,35 @@ async function handlePullRequestEvent(payload: any) {
             pullRequest.number,
             comment
         );
+
+        // Post security findings as inline review comments on specific code lines
+        if (review.securityScan && review.securityScan.findings.length > 0) {
+            try {
+                const headSha = await getPRHeadSha(
+                    installation.id,
+                    repository.owner.login,
+                    repository.name,
+                    pullRequest.number
+                );
+
+                if (headSha) {
+                    const securityReviewResult = await postSecurityReviewComments(
+                        installation.id,
+                        repository.owner.login,
+                        repository.name,
+                        pullRequest.number,
+                        headSha,
+                        review.securityScan.findings
+                    );
+                    console.log(`Security inline comments: ${securityReviewResult.success ? 'posted' : 'failed'} (${review.securityScan.findings.length} finding(s))`);
+                } else {
+                    console.error('Could not get PR head SHA for inline security comments');
+                }
+            } catch (securityError) {
+                console.error('Error posting inline security comments:', securityError);
+                // Don't fail the whole review if inline comments fail
+            }
+        }
 
         // Store review in database
         const prReview = await storePRReview({
