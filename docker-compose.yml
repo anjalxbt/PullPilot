@@ -4,11 +4,18 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # Public env vars are baked in at build time
+        # NEXT_PUBLIC_* vars are baked in at build time — pass real values here.
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_GITHUB_APP_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_APP_CLIENT_ID}
     ports:
       - "3000:3000"
+    # All runtime secrets are loaded from your .env file:
+    #   NEXTAUTH_SECRET, GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY,
+    #   GITHUB_APP_WEBHOOK_SECRET, GITHUB_APP_CLIENT_SECRET,
+    #   GITHUB_ID, GITHUB_SECRET,
+    #   SUPABASE_SERVICE_ROLE_KEY,
+    #   OPENAI_API_KEY, GROQ_API_KEY, NODE_OPTIONS
     env_file:
       - .env
     environment:

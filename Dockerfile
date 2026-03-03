@@ -24,14 +24,16 @@ RUN npm ci
 # Copy all source files
 COPY . .
 
-# Build args for public env vars (baked in at build time)
+# Build args for NEXT_PUBLIC_* vars (baked in at build time).
 # Provide real values via --build-arg or docker-compose args.
-# Placeholders below allow the build to complete without live credentials.
+# Placeholder defaults allow the build to complete without live credentials.
 ARG NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder-anon-key
+ARG NEXT_PUBLIC_GITHUB_APP_CLIENT_ID=placeholder-client-id
 
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_GITHUB_APP_CLIENT_ID=$NEXT_PUBLIC_GITHUB_APP_CLIENT_ID
 
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
