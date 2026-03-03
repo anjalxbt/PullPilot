@@ -11,6 +11,8 @@ import {
     getPRHeadSha,
 } from '@/lib/github-app';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Apply a fix suggestion to a PR using GitHub's suggestion comment feature
  * 

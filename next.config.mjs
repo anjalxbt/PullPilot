@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Produces a self-contained .next/standalone server — used by Docker runner stage
+  output: 'standalone',
   experimental: {
   },
   // Ensure proper DNS resolution for GitHub API

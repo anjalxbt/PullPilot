@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { storeInstallation } from '@/lib/repositories';
 import { getInstallationRepos } from '@/lib/github-app';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GitHub App Installation Callback
  * 

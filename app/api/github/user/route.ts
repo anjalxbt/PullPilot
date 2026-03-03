@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { githubFetch } from "@/lib/github-fetch";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.accessToken) {
@@ -18,8 +20,8 @@ export async function GET() {
     return NextResponse.json(data);
   } catch (e: any) {
     console.error("GitHub API Error:", e);
-    return NextResponse.json({ 
-      error: "Unexpected error", 
+    return NextResponse.json({
+      error: "Unexpected error",
       detail: e?.message || String(e),
       cause: e?.cause?.message || e?.cause || "Unknown"
     }, { status: 500 });

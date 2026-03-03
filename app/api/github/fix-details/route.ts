@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFixSuggestionWithRepo } from '@/lib/repositories';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Get fix suggestion details
  * 

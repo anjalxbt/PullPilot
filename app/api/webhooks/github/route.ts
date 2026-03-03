@@ -22,6 +22,8 @@ import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
 import { fetchPullPilotConfig } from '@/lib/rules-fetcher';
 import { evaluateRules, formatRulesComment, PRContext } from '@/lib/rules-engine';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
     try {
         // Get raw body for signature verification

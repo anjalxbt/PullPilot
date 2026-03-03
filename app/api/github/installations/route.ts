@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getUserInstallations, getInstallationRepositories } from '@/lib/repositories';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Get user's GitHub App installations
  */
