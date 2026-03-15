@@ -5,6 +5,22 @@ import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Deduplicate reviews: keep only the latest review per (repository_id, pr_number).
+ * This handles existing duplicate rows in the database from before the upsert fix.
+ */
+function deduplicateReviews(reviews: any[]): any[] {
+    const seen = new Map<string, any>();
+    for (const review of reviews) {
+        const key = `${review.repository_id}:${review.pr_number}`;
+        const existing = seen.get(key);
+        if (!existing || new Date(review.review_posted_at) > new Date(existing.review_posted_at)) {
+            seen.set(key, review);
+        }
+    }
+    return Array.from(seen.values());
+}
+
 export async function GET(request: Request) {
     const session = await getServerSession(authOptions);
 
@@ -64,8 +80,9 @@ export async function GET(request: Request) {
                 throw reviewsError;
             }
 
-            console.log("Reviews found:", reviews?.length || 0);
-            return NextResponse.json(reviews || []);
+            const deduplicated = deduplicateReviews(reviews || []);
+            console.log("Reviews found:", reviews?.length || 0, "after dedup:", deduplicated.length);
+            return NextResponse.json(deduplicated);
         } else {
             // Fetch all reviews for user's installations
             const { data: reviews, error: reviewsError } = await supabaseAdmin
@@ -90,8 +107,9 @@ export async function GET(request: Request) {
                 throw reviewsError;
             }
 
-            console.log("All reviews found:", reviews?.length || 0);
-            return NextResponse.json(reviews || []);
+            const deduplicated = deduplicateReviews(reviews || []);
+            console.log("All reviews found:", reviews?.length || 0, "after dedup:", deduplicated.length);
+            return NextResponse.json(deduplicated);
         }
 
     } catch (e: any) {

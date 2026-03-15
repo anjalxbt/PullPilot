@@ -198,7 +198,7 @@ export async function storePRReview(data: {
 }) {
     const { data: review, error } = await supabaseAdmin
         .from('pull_request_reviews')
-        .insert({
+        .upsert({
             repository_id: data.repository_id,
             pr_number: data.pr_number,
             pr_title: data.pr_title,
@@ -208,6 +208,9 @@ export async function storePRReview(data: {
             additions: data.additions,
             deletions: data.deletions,
             ai_model: data.ai_model,
+            review_posted_at: new Date().toISOString(),
+        }, {
+            onConflict: 'repository_id,pr_number'
         })
         .select()
         .single();
