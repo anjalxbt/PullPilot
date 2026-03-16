@@ -131,7 +131,7 @@ export default function HomePage() {
                 <div className="h-2 bg-muted/60 rounded w-5/6" />
                 <div className="h-2 bg-muted/60 rounded w-4/6" />
               </div>
-              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary/20 text-black rounded-lg border border-primary/30">
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary/20 text-primary rounded-lg border border-primary/30">
                 <span className="text-sm font-medium">📝 Create a PR</span>
               </div>
             </div>

@@ -10,7 +10,7 @@ export default function FeatureCard({ title, description, icon }: { title: strin
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="text-sm text-gray-500">Learn more →</div>
+        <div className="text-sm text-muted-foreground">Learn more →</div>
       </CardContent>
     </Card>
   );

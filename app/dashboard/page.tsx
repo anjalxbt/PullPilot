@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, ExternalLink, FileText, Github, GitPullRequest, Globe, Lock, Search, Star } from "lucide-react";
+import { BarChart3, Calendar, Download, ExternalLink, FileText, Github, GitPullRequest, Globe, Lock, Search, Star } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -36,6 +36,7 @@ type Review = {
   pr_title: string;
   review_summary: string;
   review_posted_at: string;
+  files_changed?: number;
   repositories: {
     repo_full_name: string;
     repo_name: string;
@@ -172,19 +173,34 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   ) : reviews.length === 0 ? (
-                    <div className="text-center py-8">
-                      <GitPullRequest className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No reviewed pull requests found.</p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Install the GitHub App on your repositories to start getting reviews.
+                    <div className="text-center py-12">
+                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                        <GitPullRequest className="h-8 w-8 text-primary" />
+                      </div>
+                      <p className="text-card-foreground font-medium text-lg">No reviewed pull requests yet</p>
+                      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+                        Install the GitHub App on your repositories to start getting AI-powered code reviews on every PR.
                       </p>
+                      <button
+                        onClick={() => {
+                          const tabTrigger = document.querySelector('[data-tab-value="installations"]') as HTMLElement;
+                          tabTrigger?.click();
+                        }}
+                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-all duration-200"
+                      >
+                        <Download className="h-4 w-4" />
+                        Install GitHub App
+                      </button>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {reviews.map((review, index) => (
-                        <div
+                        <a
                           key={review.id}
-                          className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-all duration-200"
+                          href={`https://github.com/${review.repositories.repo_full_name}/pull/${review.pr_number}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex flex-col gap-2 p-4 rounded-lg border border-border bg-card/50 hover:bg-card/80 hover:border-primary/40 cursor-pointer transition-all duration-200 group no-underline"
                           style={{
                             animation: `fadeIn 0.5s ease-out ${index * 0.05}s both`,
                           }}
@@ -199,19 +215,22 @@ export default function DashboardPage() {
                                   <span className="font-mono">#{review.pr_number}</span>
                                 </span>
                               </div>
-                              <h4 className="font-medium text-card-foreground truncate">{review.pr_title || `Pull Request #${review.pr_number}`}</h4>
+                              <h4 className="font-medium text-card-foreground truncate group-hover:text-primary transition-colors">{review.pr_title || `Pull Request #${review.pr_number}`}</h4>
                             </div>
-                            <div className="ml-4 text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatRelativeTime(review.review_posted_at)}
+                            <div className="ml-4 flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {formatRelativeTime(review.review_posted_at)}
+                              </span>
+                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                           </div>
 
-                          <div className="mt-2 text-sm text-secondary line-clamp-2">
-                            <FileText className="inline-block h-3 w-3 mr-1 text-muted-foreground" />
+                          <div className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                            <FileText className="inline-block h-3 w-3 mr-1" />
                             {review.review_summary}
                           </div>
-                        </div>
+                        </a>
                       ))}
                     </div>
                   )}
@@ -252,8 +271,11 @@ export default function DashboardPage() {
               ) : repos.length === 0 ? (
                 <Card className="bg-card border-border transition-colors duration-300">
                   <CardContent className="py-12 text-center">
-                    <Github className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No repositories found.</p>
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted mb-4">
+                      <Github className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-card-foreground font-medium text-lg">No repositories yet</p>
+                    <p className="text-sm text-muted-foreground mt-2">Install the GitHub App to connect your repositories.</p>
                   </CardContent>
                 </Card>
               ) : (
@@ -363,16 +385,18 @@ export default function DashboardPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
                   <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-lg transition-colors duration-300">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">24</div>
-                    <div className="text-sm text-secondary">PRs Reviewed</div>
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{reviews.length}</div>
+                    <div className="text-sm text-muted-foreground">PRs Reviewed</div>
                   </div>
                   <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 rounded-lg transition-colors duration-300">
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">18</div>
-                    <div className="text-sm text-secondary">Issues Found</div>
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{repos.length}</div>
+                    <div className="text-sm text-muted-foreground">Repositories</div>
                   </div>
                   <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30 rounded-lg transition-colors duration-300">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">92%</div>
-                    <div className="text-sm text-secondary">Code Quality</div>
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {reviews.length > 0 ? `${Math.round(reviews.reduce((sum: number, r: Review) => sum + (r.files_changed || 0), 0) / reviews.length)}` : "0"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Avg Files/PR</div>
                   </div>
                 </div>
               </CardContent>

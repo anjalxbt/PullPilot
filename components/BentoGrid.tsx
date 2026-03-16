@@ -29,7 +29,7 @@ const BentoItem = ({ title, description, icon, className = "", delay = 0 }: Bent
         >
           {icon}
         </motion.div>
-        <h3 className="text-2xl font-bold mb-3 text-white">{title}</h3>
+        <h3 className="text-2xl font-bold mb-3 text-card-foreground">{title}</h3>
         <p className="text-muted-foreground leading-relaxed">{description}</p>
       </div>
       
