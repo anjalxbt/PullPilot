@@ -256,13 +256,13 @@ export default function SecurityFindings({ findings, summary, loading }: Securit
             {findings.length > 0 && (
                 <div className="flex flex-wrap gap-3 items-center py-3 px-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600">
                     <Filter className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-                    <span className="text-sm font-semibold text-foreground">Filter:</span>
+                    <span className="text-sm font-semibold text-gray-200">Filter:</span>
 
                     <div className="relative">
                         <select
                             value={severityFilter}
                             onChange={(e) => setSeverityFilter(e.target.value as SecuritySeverity | 'all')}
-                            className="text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-foreground pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
+                            className="text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-200 pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
                         >
                             <option value="all">All Severities</option>
                             <option value="critical">Critical</option>
