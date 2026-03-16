@@ -122,23 +122,20 @@ function SummaryCards({ summary }: { summary: SecuritySummary }) {
                 return (
                     <div
                         key={severity}
-                        className={`p-5 rounded-xl border-2 transition-all duration-300 ${
-                            isActive
-                                ? `${style.activeBg} ${style.activeBorder} shadow-sm`
-                                : 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-600'
-                        }`}
+                        className={`p-5 rounded-xl border-2 transition-all duration-300 ${isActive
+                            ? `${style.activeBg} ${style.activeBorder} shadow-sm`
+                            : 'bg-zinc-100 dark:bg-zinc-800/60 border-zinc-300 dark:border-zinc-600'
+                            }`}
                     >
                         <div className="flex items-center justify-between mb-3">
                             <Icon className={`h-5 w-5 ${isActive ? style.activeLabel : 'text-zinc-500 dark:text-zinc-400'}`} />
-                            <span className={`text-[10px] font-extrabold uppercase tracking-widest ${
-                                isActive ? style.activeLabel : 'text-zinc-500 dark:text-zinc-400'
-                            }`}>
+                            <span className={`text-[10px] font-extrabold uppercase tracking-widest ${isActive ? style.activeLabel : 'text-zinc-500 dark:text-zinc-400'
+                                }`}>
                                 {severity}
                             </span>
                         </div>
-                        <div className={`text-3xl font-black ${
-                            isActive ? style.activeValue : 'text-zinc-500 dark:text-zinc-400'
-                        }`}>
+                        <div className={`text-3xl font-black ${isActive ? style.activeValue : 'text-zinc-500 dark:text-zinc-400'
+                            }`}>
                             {count}
                         </div>
                     </div>
@@ -160,15 +157,15 @@ function CategoryBreakdown({ findings }: { findings: SecurityFinding[] }) {
 
     return (
         <div>
-            <p className="text-sm font-semibold text-foreground mb-3">Issues by Category</p>
+            <p className="text-sm font-semibold text-gray-200 mb-3">Issues by Category</p>
             <div className="flex flex-wrap gap-2">
                 {categories.map(([category, count]) => (
                     <span
                         key={category}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-foreground border border-zinc-300 dark:border-zinc-600"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-gray-200  border border-zinc-300 dark:border-zinc-600"
                     >
                         {category.replace(/-/g, ' ')}
-                        <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-white text-xs font-bold">{count}</span>
+                        <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-gray-200  text-xs font-bold">{count}</span>
                     </span>
                 ))}
             </div>
@@ -193,7 +190,7 @@ function FindingCard({ finding }: { finding: SecurityFinding }) {
                             {finding.rule_id}
                         </code>
                     </div>
-                    <h4 className="font-bold text-foreground text-base">{finding.rule_name}</h4>
+                    <h4 className="font-bold text-gray-200  text-base">{finding.rule_name}</h4>
                 </div>
             </div>
 
