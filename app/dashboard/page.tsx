@@ -1,5 +1,5 @@
 "use client";
-import AnalyticsChart from "@/components/AnalyticsChart";
+import AnalyticsDashboard from "@/components/AnalyticsDashboard";
 import InstallGitHubApp from "@/components/InstallGitHubApp";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -34,9 +34,12 @@ type Review = {
   id: string;
   pr_number: number;
   pr_title: string;
+  pr_author?: string;
   review_summary: string;
   review_posted_at: string;
   files_changed?: number;
+  additions?: number;
+  deletions?: number;
   repositories: {
     repo_full_name: string;
     repo_name: string;
@@ -373,34 +376,7 @@ export default function DashboardPage() {
 
           {/* Analytics Tab */}
           <TabsContent tabValue="analytics">
-            <Card className="bg-card border-border transition-colors duration-300">
-              <CardHeader>
-                <CardTitle className="text-card-foreground">Review Analytics</CardTitle>
-                <CardDescription className="text-muted-foreground">Track your code review activity and trends</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium mb-2 text-card-foreground">Weekly Activity</h4>
-                  <AnalyticsChart />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-                  <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-lg transition-colors duration-300">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{reviews.length}</div>
-                    <div className="text-sm text-muted-foreground">PRs Reviewed</div>
-                  </div>
-                  <div className="p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30 rounded-lg transition-colors duration-300">
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{repos.length}</div>
-                    <div className="text-sm text-muted-foreground">Repositories</div>
-                  </div>
-                  <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-100 dark:border-green-900/30 rounded-lg transition-colors duration-300">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {reviews.length > 0 ? `${Math.round(reviews.reduce((sum: number, r: Review) => sum + (r.files_changed || 0), 0) / reviews.length)}` : "0"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">Avg Files/PR</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <AnalyticsDashboard reviews={reviews} repos={repos} />
           </TabsContent>
 
           {/* Settings Tab */}
