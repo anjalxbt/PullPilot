@@ -190,7 +190,7 @@ function FindingCard({ finding }: { finding: SecurityFinding }) {
                             {finding.rule_id}
                         </code>
                     </div>
-                    <h4 className="font-bold text-gray-200  text-base">{finding.rule_name}</h4>
+                    <h4 className="font-bold text-foreground  text-base">{finding.rule_name}</h4>
                 </div>
             </div>
 
