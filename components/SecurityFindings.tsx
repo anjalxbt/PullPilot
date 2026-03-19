@@ -162,7 +162,7 @@ function CategoryBreakdown({ findings }: { findings: SecurityFinding[] }) {
                 {categories.map(([category, count]) => (
                     <span
                         key={category}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-gray-200  border border-zinc-300 dark:border-zinc-600"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-zinc-100 dark:bg-zinc-800 text-foreground  border border-zinc-300 dark:border-zinc-600"
                     >
                         {category.replace(/-/g, ' ')}
                         <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-gray-200  text-xs font-bold">{count}</span>
@@ -186,7 +186,7 @@ function FindingCard({ finding }: { finding: SecurityFinding }) {
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <SeverityBadge severity={finding.severity} />
-                        <code className="text-xs text-zinc-600 dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 rounded font-mono">
+                        <code className="text-xs text-foreground dark:text-zinc-300 bg-zinc-200 dark:bg-zinc-700 px-2 py-0.5 rounded font-mono">
                             {finding.rule_id}
                         </code>
                     </div>
@@ -256,13 +256,13 @@ export default function SecurityFindings({ findings, summary, loading }: Securit
             {findings.length > 0 && (
                 <div className="flex flex-wrap gap-3 items-center py-3 px-4 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600">
                     <Filter className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-                    <span className="text-sm font-semibold text-gray-200">Filter:</span>
+                    <span className="text-sm font-semibold text-foreground">Filter:</span>
 
                     <div className="relative">
                         <select
                             value={severityFilter}
                             onChange={(e) => setSeverityFilter(e.target.value as SecuritySeverity | 'all')}
-                            className="text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-gray-200 pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
+                            className="text-sm rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-foreground pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
                         >
                             <option value="all">All Severities</option>
                             <option value="critical">Critical</option>
