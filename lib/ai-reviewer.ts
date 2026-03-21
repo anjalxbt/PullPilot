@@ -81,16 +81,16 @@ export async function analyzePullRequest(
     const providers: { name: string; fn: ProviderFn }[] = [];
 
     if (process.env.OPENAI_API_KEY) {
-        providers.push({ name: 'OpenAI', fn: () => analyzeWithOpenAI(prTitle, prDescription, files, diff) });
+        providers.push({ name: 'OpenAI', fn: () => analyzeWithOpenAI(prTitle, prDescription, files, diff, securityScan.findings) });
     }
     if (process.env.ANTHROPIC_API_KEY) {
-        providers.push({ name: 'Anthropic', fn: () => analyzeWithAnthropic(prTitle, prDescription, files, diff) });
+        providers.push({ name: 'Anthropic', fn: () => analyzeWithAnthropic(prTitle, prDescription, files, diff, securityScan.findings) });
     }
     if (isGeminiConfigured()) {
-        providers.push({ name: 'Gemini', fn: () => analyzeWithGemini(prTitle, prDescription, files, diff) });
+        providers.push({ name: 'Gemini', fn: () => analyzeWithGemini(prTitle, prDescription, files, diff, securityScan.findings) });
     }
     if (isGroqConfigured()) {
-        providers.push({ name: 'Groq', fn: () => analyzeWithGroq(prTitle, prDescription, files, diff) });
+        providers.push({ name: 'Groq', fn: () => analyzeWithGroq(prTitle, prDescription, files, diff, securityScan.findings) });
     }
 
     // Try each provider in sequence, fallback to next on failure
@@ -129,7 +129,8 @@ async function analyzeWithOpenAI(
     prTitle: string,
     prDescription: string,
     files: PRFile[],
-    diff: string
+    diff: string,
+    securityFindings: SecurityFinding[] = []
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -137,7 +138,7 @@ async function analyzeWithOpenAI(
         throw new Error('OpenAI API key not configured');
     }
 
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
 
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -185,7 +186,8 @@ async function analyzeWithAnthropic(
     prTitle: string,
     prDescription: string,
     files: PRFile[],
-    diff: string
+    diff: string,
+    securityFindings: SecurityFinding[] = []
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -193,7 +195,7 @@ async function analyzeWithAnthropic(
         throw new Error('Anthropic API key not configured');
     }
 
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
 
     try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -237,9 +239,10 @@ async function analyzeWithGemini(
     prTitle: string,
     prDescription: string,
     files: PRFile[],
-    diff: string
+    diff: string,
+    securityFindings: SecurityFinding[] = []
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
     const systemInstruction = 'You are an expert code reviewer. Analyze pull requests and provide constructive feedback.';
 
     try {
@@ -266,9 +269,10 @@ async function analyzeWithGroq(
     prTitle: string,
     prDescription: string,
     files: PRFile[],
-    diff: string
+    diff: string,
+    securityFindings: SecurityFinding[] = []
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
     const systemInstruction = 'You are an expert code reviewer. Analyze pull requests and provide constructive feedback.';
 
     try {
@@ -295,7 +299,8 @@ function buildAnalysisPrompt(
     prTitle: string,
     prDescription: string,
     files: PRFile[],
-    diff: string
+    diff: string,
+    securityFindings: SecurityFinding[] = []
 ): string {
     const filesSummary = files
         .map(f => `- ${f.filename} (+${f.additions}/-${f.deletions})`)
@@ -305,6 +310,15 @@ function buildAnalysisPrompt(
     const truncatedDiff = diff.length > 10000
         ? diff.substring(0, 10000) + '\n\n... (diff truncated for brevity)'
         : diff;
+
+    // Build a note about already-flagged security issues to avoid duplication
+    let securityNote = '';
+    if (securityFindings.length > 0) {
+        const flaggedIssues = securityFindings
+            .map(f => `- ${f.ruleName} (${f.severity}): ${f.file}${f.line ? `:${f.line}` : ''} — ${f.message}`)
+            .join('\n');
+        securityNote = `\n\n**IMPORTANT: The following security issues have already been flagged by our automated security scanner and will be posted as separate inline comments on the PR. Do NOT repeat these in your CONCERNS section. Focus on other non-security concerns like logic bugs, performance, code quality, etc.**\n\nAlready flagged:\n${flaggedIssues}\n`;
+    }
 
     return `Please review this pull request and provide a structured analysis.
 
@@ -319,7 +333,7 @@ ${filesSummary}
 \`\`\`diff
 ${truncatedDiff}
 \`\`\`
-
+${securityNote}
 Please provide your review in the following format:
 
 **SUMMARY:**
@@ -330,7 +344,7 @@ Please provide your review in the following format:
 - [List 2-4 items]
 
 **CONCERNS:**
-- [Potential issues, bugs, or problems to address]
+- [Potential issues, bugs, or problems to address — do NOT repeat issues already flagged by the security scanner]
 - [List any concerns, or write "None" if there are no concerns]
 
 **SUGGESTIONS:**
