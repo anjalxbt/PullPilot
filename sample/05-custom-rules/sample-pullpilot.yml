@@ -1,0 +1,57 @@
+# Test PullPilot Custom Rules Configuration
+# Copy this file to the repository root as .pullpilot.yml
+
+version: 1
+
+rules:
+  # Flag large PRs (set low threshold for easy testing)
+  - id: pr-size-check
+    name: "Large PR Warning"
+    type: pr-size
+    condition:
+      max_lines: 100
+    severity: warning
+    message: "⚠️ This PR has more than 100 lines changed. Consider breaking it into smaller PRs."
+
+  # Require tests for API changes
+  - id: api-test-required
+    name: "API Test Requirement"
+    type: file-pattern
+    condition:
+      changed_files: "src/api/**"
+      require_files: "**/*.test.*"
+    severity: error
+    message: "❌ Changes to API require corresponding test updates."
+
+  # Block .env file changes
+  - id: block-env-changes
+    name: "Environment File Protection"
+    type: file-pattern
+    condition:
+      block_files: ".env*"
+    severity: error
+    message: "🚫 Direct changes to environment files are not allowed."
+
+  # Detect console.log statements
+  - id: no-console-logs
+    name: "No Console Logs"
+    type: content-pattern
+    condition:
+      pattern: "console\\.log\\("
+      file_extensions: [".ts", ".js", ".tsx", ".jsx"]
+      exclude_paths: ["**/test/**", "**/*.test.*"]
+    severity: warning
+    message: "🔍 Found console.log statements. Please remove before merging."
+
+  # Require minimum reviewers
+  - id: require-reviewers
+    name: "Reviewer Required"
+    type: reviewers
+    condition:
+      min_reviewers: 1
+    severity: info
+    message: "👥 Consider adding at least 1 reviewer for this PR."
+
+settings:
+  auto_comment: true
+  ignore_draft_prs: true
