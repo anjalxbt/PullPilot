@@ -44,6 +44,15 @@ export async function GET(request: NextRequest) {
         const username = (session?.user as any)?.username || session?.user?.name;
 
         if (!username) {
+            // Check if client expects JSON
+            const accept = request.headers.get('accept') || '';
+            if (accept.includes('application/json')) {
+                return NextResponse.json(
+                    { error: 'Authentication required. Please log in.' },
+                    { status: 401 }
+                );
+            }
+
             // Redirect to login with callback to this URL
             const loginUrl = new URL('/api/auth/signin', request.url);
             loginUrl.searchParams.set('callbackUrl', request.url);

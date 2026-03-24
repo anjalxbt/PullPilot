@@ -189,6 +189,44 @@ async function handlePullRequestEvent(payload: any) {
         );
 
 
+        // Store review in database
+        const prReview = await storePRReview({
+            repository_id: repoRecord.id,
+            pr_number: pullRequest.number,
+            pr_title: pullRequest.title,
+            pr_author: pullRequest.user.login,
+            review_summary: review.summary,
+            files_changed: prFiles.length,
+            additions: prDetails.additions,
+            deletions: prDetails.deletions,
+            ai_model: review.aiModel,
+        });
+
+        // Store security findings if any
+        if (review.securityScan && review.securityScan.findings.length > 0) {
+            await storeSecurityFindings(prReview.id, review.securityScan.findings);
+            await updateReviewSecuritySummary(prReview.id, review.securityScan.summary);
+        }
+
+        // Store fix suggestions if any
+        if (review.fixSuggestions && review.fixSuggestions.length > 0) {
+            // pullRequest.head.repo contains the fork info for fork PRs
+            const headRepoOwner = pullRequest.head.repo?.owner?.login;
+            const headRepoName = pullRequest.head.repo?.name;
+
+            await storeFixSuggestions(
+                prReview.id,
+                repoRecord.id,
+                pullRequest.number,
+                pullRequest.head.ref,
+                pullRequest.user.login,
+                review.fixSuggestions,
+                headRepoOwner,  // For fork PRs, this is the fork owner
+                headRepoName    // For fork PRs, this is the fork repo name
+            );
+            console.log(`Stored ${review.fixSuggestions.length} fix suggestion(s) for ${headRepoOwner}/${headRepoName}:${pullRequest.head.ref}`);
+        }
+
         // Format and post comment (combine AI review + rules violations)
         let comment = formatReviewComment(review);
         if (rulesViolations && rulesViolations.violations.length > 0) {
@@ -231,44 +269,6 @@ async function handlePullRequestEvent(payload: any) {
                 console.error('Error posting inline security comments:', securityError);
                 // Don't fail the whole review if inline comments fail
             }
-        }
-
-        // Store review in database
-        const prReview = await storePRReview({
-            repository_id: repoRecord.id,
-            pr_number: pullRequest.number,
-            pr_title: pullRequest.title,
-            pr_author: pullRequest.user.login,
-            review_summary: review.summary,
-            files_changed: prFiles.length,
-            additions: prDetails.additions,
-            deletions: prDetails.deletions,
-            ai_model: review.aiModel,
-        });
-
-        // Store security findings if any
-        if (review.securityScan && review.securityScan.findings.length > 0) {
-            await storeSecurityFindings(prReview.id, review.securityScan.findings);
-            await updateReviewSecuritySummary(prReview.id, review.securityScan.summary);
-        }
-
-        // Store fix suggestions if any
-        if (review.fixSuggestions && review.fixSuggestions.length > 0) {
-            // pullRequest.head.repo contains the fork info for fork PRs
-            const headRepoOwner = pullRequest.head.repo?.owner?.login;
-            const headRepoName = pullRequest.head.repo?.name;
-
-            await storeFixSuggestions(
-                prReview.id,
-                repoRecord.id,
-                pullRequest.number,
-                pullRequest.head.ref,
-                pullRequest.user.login,
-                review.fixSuggestions,
-                headRepoOwner,  // For fork PRs, this is the fork owner
-                headRepoName    // For fork PRs, this is the fork repo name
-            );
-            console.log(`Stored ${review.fixSuggestions.length} fix suggestion(s) for ${headRepoOwner}/${headRepoName}:${pullRequest.head.ref}`);
         }
 
         // Apply auto-labels (only high confidence)

@@ -274,7 +274,6 @@ export async function addLabelsToIssue(
             accessToken: token,
             endpoint: `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
             method: 'POST',
-            // Send the array directly as some GitHub API integrations prefer this format over { labels }
             body: { labels },
         });
         console.log(`Successfully applied labels to #${issueNumber}:`, labels);
@@ -420,6 +419,7 @@ ${replacementContent}
             body: {
                 commit_id: commitSha,
                 event: 'COMMENT',
+                body: `💡 **PullPilot Auto-Fix** has generated a suggestion for you.`,
                 comments: [
                     {
                         path: filePath,
