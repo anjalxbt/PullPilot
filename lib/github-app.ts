@@ -269,15 +269,17 @@ export async function addLabelsToIssue(
     const token = await getInstallationAccessToken(installationId);
 
     try {
+        console.log(`Attempting to apply labels to #${issueNumber} in ${owner}/${repo}:`, labels);
         await githubFetch({
             accessToken: token,
             endpoint: `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
             method: 'POST',
-            body: { labels },
+            // Send the array directly as some GitHub API integrations prefer this format over { labels }
+            body: labels,
         });
-        console.log(`Applied labels to #${issueNumber}:`, labels);
-    } catch (error) {
-        console.error('Error adding labels:', error);
+        console.log(`Successfully applied labels to #${issueNumber}:`, labels);
+    } catch (error: any) {
+        console.error(`Error adding labels to #${issueNumber}:`, error?.message || error);
         // Don't throw - labels are not critical
     }
 }
@@ -293,20 +295,22 @@ export async function createLabel(
     const token = await getInstallationAccessToken(installationId);
 
     try {
+        console.log(`Attempting to create label "${name}" in ${owner}/${repo}`);
         await githubFetch({
             accessToken: token,
             endpoint: `/repos/${owner}/${repo}/labels`,
             method: 'POST',
             body: { name, color, description },
         });
-        console.log(`Created label "${name}" in ${owner}/${repo}`);
+        console.log(`Successfully created label "${name}" in ${owner}/${repo}`);
         return true;
     } catch (error: any) {
         // Label might already exist (422 error)
         if (error.message?.includes('422') || error.message?.includes('already_exists')) {
+            console.log(`Label "${name}" already exists in ${owner}/${repo}`);
             return true;
         }
-        console.error('Error creating label:', error);
+        console.error(`Error creating label "${name}":`, error?.message || error);
         return false;
     }
 }
