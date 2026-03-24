@@ -17,8 +17,10 @@ import {
     postSecurityReviewComments,
     getPRHeadSha,
     addLabelsToIssue,
+    createLabel,
 } from '@/lib/github-app';
 import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
+import { getLabelColor } from '@/lib/auto-labeler';
 import { fetchPullPilotConfig } from '@/lib/rules-fetcher';
 import { evaluateRules, formatRulesComment, PRContext } from '@/lib/rules-engine';
 
@@ -275,6 +277,17 @@ async function handlePullRequestEvent(payload: any) {
             .map(l => l.label);
 
         if (labelsToApply.length > 0) {
+            // Ensure labels exist before applying them to the PR
+            for (const label of labelsToApply) {
+                await createLabel(
+                    installation.id,
+                    repository.owner.login,
+                    repository.name,
+                    label,
+                    getLabelColor(label)
+                );
+            }
+
             await addLabelsToIssue(
                 installation.id,
                 repository.owner.login,

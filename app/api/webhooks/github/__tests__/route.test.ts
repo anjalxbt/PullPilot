@@ -25,6 +25,7 @@ vi.mock('@/lib/github-app', () => ({
     postSecurityReviewComments: vi.fn(),
     getPRHeadSha: vi.fn(),
     addLabelsToIssue: vi.fn(),
+    createLabel: vi.fn(),
 }));
 
 vi.mock('@/lib/ai-reviewer', () => ({
@@ -60,6 +61,7 @@ import {
     postSecurityReviewComments,
     getPRHeadSha,
     addLabelsToIssue,
+    createLabel,
 } from '@/lib/github-app';
 import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
 import { fetchPullPilotConfig } from '@/lib/rules-fetcher';
@@ -242,6 +244,7 @@ describe('POST /api/webhooks/github', () => {
         vi.mocked(getPRHeadSha).mockResolvedValue('abc123sha');
         vi.mocked(postPRComment).mockResolvedValue(undefined);
         vi.mocked(addLabelsToIssue).mockResolvedValue(undefined);
+        vi.mocked(createLabel).mockResolvedValue(true);
 
         // AI review mock
         vi.mocked(analyzePullRequest).mockResolvedValue({
@@ -271,6 +274,7 @@ describe('POST /api/webhooks/github', () => {
         // Verify side effects
         expect(postPRComment).toHaveBeenCalledOnce();
         expect(storePRReview).toHaveBeenCalledOnce();
+        expect(createLabel).toHaveBeenCalledOnce();
         expect(addLabelsToIssue).toHaveBeenCalledOnce();
         expect(storeSecurityFindings).not.toHaveBeenCalled();
     });
