@@ -275,7 +275,7 @@ export async function addLabelsToIssue(
             endpoint: `/repos/${owner}/${repo}/issues/${issueNumber}/labels`,
             method: 'POST',
             // Send the array directly as some GitHub API integrations prefer this format over { labels }
-            body: labels,
+            body: { labels },
         });
         console.log(`Successfully applied labels to #${issueNumber}:`, labels);
     } catch (error: any) {
