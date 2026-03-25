@@ -161,11 +161,17 @@ export function validateConfig(config: any): PullPilotConfig {
         ...(config.settings || {}),
     };
 
-    return {
+    const result: PullPilotConfig = {
         version: 1,
         rules,
         settings,
     };
+
+    if (config.auto_fix) {
+        result.auto_fix = config.auto_fix;
+    }
+
+    return result;
 }
 
 /**

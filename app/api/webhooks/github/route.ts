@@ -147,10 +147,13 @@ async function handlePullRequestEvent(payload: any) {
         let rulesViolations: any = null;
         let autoFixConfig: any = undefined;
         try {
+            const headRepoOwner = pullRequest.head.repo?.owner?.login || repository.owner.login;
+            const headRepoName = pullRequest.head.repo?.name || repository.name;
+
             const rulesConfig = await fetchPullPilotConfig(
                 installation.id,
-                repository.owner.login,
-                repository.name,
+                headRepoOwner,
+                headRepoName,
                 pullRequest.head.ref
             );
 
