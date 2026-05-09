@@ -6,34 +6,33 @@
  */
 
 import {
-    scanForSecurityIssues,
     formatSecuritySummaryLine,
-    SecurityScanResult,
-    SecurityFinding
+    scanForSecurityIssues,
+    SecurityFinding,
+    SecurityScanResult
 } from './security-scanner';
 
 import {
     detectLabels,
-    formatLabelComment,
     LabelSuggestion
 } from './auto-labeler';
 
 import {
-    generateFixSuggestions,
-    formatFixSuggestionsComment,
-    FixSuggestion,
     AutoFixConfig,
+    FixSuggestion,
+    formatFixSuggestionsComment,
+    generateFixSuggestions,
     getAutoFixConfig,
 } from './fix-generator';
 
 import {
-    isGeminiConfigured,
     generateContentWithSystem,
+    isGeminiConfigured,
 } from './gemini';
 
 import {
-    isGroqConfigured,
     generateContentWithSystem as generateGroqContent,
+    isGroqConfigured,
 } from './groq';
 
 interface PRFile {
@@ -64,7 +63,8 @@ export async function analyzePullRequest(
     prDescription: string,
     files: PRFile[],
     diff: string,
-    autoFixConfig?: Partial<AutoFixConfig>
+    autoFixConfig?: Partial<AutoFixConfig>,
+    codeGraphContext?: any[]
 ): Promise<ReviewResult> {
     // Run security scan
     const securityScan = scanForSecurityIssues(diff, files);
@@ -81,20 +81,21 @@ export async function analyzePullRequest(
     const providers: { name: string; fn: ProviderFn }[] = [];
 
     if (process.env.OPENAI_API_KEY) {
-        providers.push({ name: 'OpenAI', fn: () => analyzeWithOpenAI(prTitle, prDescription, files, diff, securityScan.findings) });
+        providers.push({ name: 'OpenAI', fn: () => analyzeWithOpenAI(prTitle, prDescription, files, diff, securityScan.findings, codeGraphContext) });
     }
     if (process.env.ANTHROPIC_API_KEY) {
-        providers.push({ name: 'Anthropic', fn: () => analyzeWithAnthropic(prTitle, prDescription, files, diff, securityScan.findings) });
+        providers.push({ name: 'Anthropic', fn: () => analyzeWithAnthropic(prTitle, prDescription, files, diff, securityScan.findings, codeGraphContext) });
     }
     if (isGeminiConfigured()) {
-        providers.push({ name: 'Gemini', fn: () => analyzeWithGemini(prTitle, prDescription, files, diff, securityScan.findings) });
+        providers.push({ name: 'Gemini', fn: () => analyzeWithGemini(prTitle, prDescription, files, diff, securityScan.findings, codeGraphContext) });
     }
     if (isGroqConfigured()) {
-        providers.push({ name: 'Groq', fn: () => analyzeWithGroq(prTitle, prDescription, files, diff, securityScan.findings) });
+        providers.push({ name: 'Groq', fn: () => analyzeWithGroq(prTitle, prDescription, files, diff, securityScan.findings, codeGraphContext) });
     }
 
     // Try each provider in sequence, fallback to next on failure
     let baseReview: Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'> | null = null;
+
 
     for (const provider of providers) {
         try {
@@ -130,7 +131,8 @@ async function analyzeWithOpenAI(
     prDescription: string,
     files: PRFile[],
     diff: string,
-    securityFindings: SecurityFinding[] = []
+    securityFindings: SecurityFinding[] = [],
+    codeGraphContext?: any[]
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
     const apiKey = process.env.OPENAI_API_KEY;
 
@@ -138,7 +140,7 @@ async function analyzeWithOpenAI(
         throw new Error('OpenAI API key not configured');
     }
 
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings, codeGraphContext);
 
     try {
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -187,7 +189,8 @@ async function analyzeWithAnthropic(
     prDescription: string,
     files: PRFile[],
     diff: string,
-    securityFindings: SecurityFinding[] = []
+    securityFindings: SecurityFinding[] = [],
+    codeGraphContext?: any[]
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
 
@@ -195,7 +198,7 @@ async function analyzeWithAnthropic(
         throw new Error('Anthropic API key not configured');
     }
 
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings, codeGraphContext);
 
     try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -240,9 +243,10 @@ async function analyzeWithGemini(
     prDescription: string,
     files: PRFile[],
     diff: string,
-    securityFindings: SecurityFinding[] = []
+    securityFindings: SecurityFinding[] = [],
+    codeGraphContext?: any[]
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings, codeGraphContext);
     const systemInstruction = 'You are an expert code reviewer. Analyze pull requests and provide constructive feedback.';
 
     try {
@@ -270,9 +274,10 @@ async function analyzeWithGroq(
     prDescription: string,
     files: PRFile[],
     diff: string,
-    securityFindings: SecurityFinding[] = []
+    securityFindings: SecurityFinding[] = [],
+    codeGraphContext?: any[]
 ): Promise<Omit<ReviewResult, 'securityScan' | 'suggestedLabels' | 'fixSuggestions'>> {
-    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings);
+    const prompt = buildAnalysisPrompt(prTitle, prDescription, files, diff, securityFindings, codeGraphContext);
     const systemInstruction = 'You are an expert code reviewer. Analyze pull requests and provide constructive feedback.';
 
     try {
@@ -300,7 +305,8 @@ function buildAnalysisPrompt(
     prDescription: string,
     files: PRFile[],
     diff: string,
-    securityFindings: SecurityFinding[] = []
+    securityFindings: SecurityFinding[] = [],
+    codeGraphContext?: any[]
 ): string {
     const filesSummary = files
         .map(f => `- ${f.filename} (+${f.additions}/-${f.deletions})`)
@@ -334,6 +340,10 @@ ${filesSummary}
 ${truncatedDiff}
 \`\`\`
 ${securityNote}
+
+**Codebase Intelligence Context:**
+${codeGraphContext ? JSON.stringify(codeGraphContext, null, 2) : 'No graph context available.'}
+
 Please provide your review in the following format:
 
 **SUMMARY:**

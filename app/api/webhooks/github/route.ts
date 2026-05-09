@@ -1,28 +1,30 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyWebhookSignature } from '@/lib/webhook-verify';
+import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
+import { getLabelColor } from '@/lib/auto-labeler';
+import { RepositoryIndexer } from '@/lib/codegraph/indexer/repository-indexer';
+import {
+    addLabelsToIssue,
+    createLabel,
+    getPRHeadSha,
+    getPullRequest,
+    getPullRequestDiff,
+    getPullRequestFiles,
+    postPRComment,
+    postSecurityReviewComments,
+} from '@/lib/github-app';
 import {
     getInstallationById,
     getRepositoryByRepoId,
-    storeRepository,
+    storeFixSuggestions,
     storePRReview,
+    storeRepository,
     storeSecurityFindings,
     updateReviewSecuritySummary,
-    storeFixSuggestions,
 } from '@/lib/repositories';
-import {
-    getPullRequest,
-    getPullRequestFiles,
-    getPullRequestDiff,
-    postPRComment,
-    postSecurityReviewComments,
-    getPRHeadSha,
-    addLabelsToIssue,
-    createLabel,
-} from '@/lib/github-app';
-import { analyzePullRequest, formatReviewComment } from '@/lib/ai-reviewer';
-import { getLabelColor } from '@/lib/auto-labeler';
-import { fetchPullPilotConfig } from '@/lib/rules-fetcher';
+import { ContextBuilder } from '@/lib/reviewer/context-builder';
 import { evaluateRules, formatRulesComment, PRContext } from '@/lib/rules-engine';
+import { fetchPullPilotConfig } from '@/lib/rules-fetcher';
+import { verifyWebhookSignature } from '@/lib/webhook-verify';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -182,13 +184,41 @@ async function handlePullRequestEvent(payload: any) {
             // Don't fail the review if rules evaluation fails
         }
 
+        // Context Building
+        let codeGraphContext: any[] | undefined = undefined;
+        try {
+            // MVP: Mock repo path for now. In prod, repo should be cloned.
+            // Assuming local clone exists or indexing a test folder wrapper
+            const repoPath = process.env.LOCAL_REPO_CACHE_PATH || `/tmp/repos/${repository.full_name}`;
+            const indexer = new RepositoryIndexer();
+            // Try load cache, if not exists, index (assuming repo is cloned at repoPath locally)
+            await indexer.loadCache();
+            // await indexer.indexRepository(repoPath);  <-- In real flow, clone repo here then await indexer
+
+            const contextBuilder = new ContextBuilder(indexer);
+
+            // Basic regex to find added functionality via diff
+            const changedFunctionsMatch = prDiff.match(/^\+\s*(?:export\s+)?(?:async\s+)?(?:function|class|const|let)\s+([a-zA-Z0-9_]+)/gm);
+            const changedFunctions = changedFunctionsMatch
+                ? Array.from(new Set(changedFunctionsMatch.map(str => str.split(/\s+/).pop()!)))
+                : [];
+
+            if (changedFunctions.length > 0) {
+                codeGraphContext = await contextBuilder.buildEnrichedPrompt(changedFunctions);
+                console.log(`Extracted context for ${changedFunctions.length} functions.`);
+            }
+        } catch (e) {
+            console.error('Error building code graph context', e);
+        }
+
         // Analyze PR with AI (pass auto-fix config if available)
         const review = await analyzePullRequest(
             pullRequest.title,
             pullRequest.body || '',
             prFiles,
             prDiff,
-            autoFixConfig
+            autoFixConfig,
+            codeGraphContext
         );
 
 
