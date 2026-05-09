@@ -190,7 +190,7 @@ async function handlePullRequestEvent(payload: any) {
             // MVP: Mock repo path for now. In prod, repo should be cloned.
             // Assuming local clone exists or indexing a test folder wrapper
             const repoPath = process.env.LOCAL_REPO_CACHE_PATH || `/tmp/repos/${repository.full_name}`;
-            const indexer = new RepositoryIndexer();
+            const indexer = new RepositoryIndexer(repoRecord.id);
             // Try load cache, if not exists, index (assuming repo is cloned at repoPath locally)
             await indexer.loadCache();
             // await indexer.indexRepository(repoPath);  <-- In real flow, clone repo here then await indexer

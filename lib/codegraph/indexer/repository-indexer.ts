@@ -4,13 +4,15 @@ import path from 'path';
 import { CodeGraph } from '../graph/CodeGraph';
 import { TreeSitterParser } from '../parsers/tree-sitter';
 
-const CACHE_FILE = path.join(process.cwd(), '.codegraph-cache.json');
+import { getCodeGraphCache, storeCodeGraphCache } from '../../repositories';
 
 export class RepositoryIndexer {
     private graph: CodeGraph;
     private fileHashes: Map<string, string>;
+    private repositoryId: string;
 
-    constructor() {
+    constructor(repositoryId: string) {
+        this.repositoryId = repositoryId;
         this.graph = new CodeGraph();
         this.fileHashes = new Map();
     }
@@ -21,28 +23,27 @@ export class RepositoryIndexer {
 
     public async loadCache(): Promise<boolean> {
         try {
-            if (fs.existsSync(CACHE_FILE)) {
-                const data = fs.readFileSync(CACHE_FILE, 'utf-8');
-                const parsed = JSON.parse(data);
+            const parsed = await getCodeGraphCache(this.repositoryId);
+            if (parsed) {
                 this.graph.deserialize(parsed.graph);
                 this.fileHashes = new Map(parsed.hashes);
                 return true;
             }
         } catch (e) {
-            console.error('Failed to load code graph cache', e);
+            console.error('Failed to load code graph cache from DB', e);
         }
         return false;
     }
 
     public async saveCache() {
         try {
-            const data = JSON.stringify({
+            const data = {
                 graph: this.graph.serialize(),
                 hashes: Array.from(this.fileHashes.entries()),
-            });
-            fs.writeFileSync(CACHE_FILE, data, 'utf-8');
+            };
+            await storeCodeGraphCache(this.repositoryId, data);
         } catch (e) {
-            console.error('Failed to save code graph cache', e);
+            console.error('Failed to save code graph cache to DB', e);
         }
     }
 

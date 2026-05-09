@@ -683,3 +683,43 @@ export async function expireFixesForPR(
         throw error;
     }
 }
+
+// ========== CODE GRAPH CACHE ==========
+
+/**
+ * Get CodeGraph cache data for a repository
+ */
+export async function getCodeGraphCache(repository_id: string): Promise<any | null> {
+    const { data, error } = await supabaseAdmin
+        .from('repository_code_graphs')
+        .select('cache_data')
+        .eq('repository_id', repository_id)
+        .maybeSingle();
+
+    if (error) {
+        console.error('Error fetching code graph cache:', error);
+        throw error;
+    }
+
+    return data?.cache_data || null;
+}
+
+/**
+ * Store CodeGraph cache data for a repository
+ */
+export async function storeCodeGraphCache(repository_id: string, cache_data: any): Promise<void> {
+    const { error } = await supabaseAdmin
+        .from('repository_code_graphs')
+        .upsert({
+            repository_id,
+            cache_data,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: 'repository_id'
+        });
+
+    if (error) {
+        console.error('Error storing code graph cache:', error);
+        throw error;
+    }
+}
